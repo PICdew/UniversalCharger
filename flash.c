@@ -12,8 +12,8 @@ void writeFlash(UINT16 iAddr, UINT16 iData)
     PMCON2 = 0x55;  //unlock program memory
     PMCON2 = 0xAA;  //unlock program memory
     WR = 1;         //begin write
-    NOP();     //to give time to write
-    NOP();     //to give time to write
+    NOP();
+    NOP();
     WREN = 0;       //disallow write
     //END OF ERASE SECTION
 
@@ -30,8 +30,8 @@ void writeFlash(UINT16 iAddr, UINT16 iData)
     PMCON2 = 0x55;  //unlock program memory
     PMCON2 = 0xAA;  //unlock program memory
     WR = 1;         //begin write
-    NOP();     //to give time to write
-    NOP();     //to give time to write
+    NOP();
+    NOP();
     WREN= 0;        //disallow write
     //END OF WRITE SECTION
     GIE = 1;        //enable interupts again
@@ -43,7 +43,8 @@ UINT16 readFlash(UINT16 iAddr)
     PMADRL = iAddr&0xFF;
     PMADRH = (iAddr&0xFF00)>>8;
     RD = 1;         //initiate read operation
-    NOP();     //to give time to read
-    NOP();     //to give time to read
+    NOP();
+    NOP();
     return (PMDATH<<8) | PMDATL;  //joins bytes & returns the value stored
-} 
+}
+

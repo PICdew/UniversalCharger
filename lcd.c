@@ -54,12 +54,12 @@ void __inline lcdConfig(void)
     lcd4(0x28,CMD);
     lcd4(0x0C,CMD);
     lcd4(6,CMD);
-    lcdClear;
+    lcdClear();
     for(iNdx=0;iNdx<25;iNdx++)
         __delay_ms(10);
     lcd4(0x80,CMD);
     lcd4(32,DATA);
-    lcdClear;
+    lcdClear();
 }
 
 void lcdOut(UINT8 iCmd, const char *sMsg)

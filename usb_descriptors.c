@@ -13,7 +13,7 @@
 #include "./USB/usb_function_cdc.h"
 
 /* Device Descriptor */
-ROM USB_DEVICE_DESCRIPTOR device_dsc=
+const USB_DEVICE_DESCRIPTOR device_dsc=
 {
     0x12,                   // Size of this descriptor in bytes
     USB_DESCRIPTOR_DEVICE,  // DEVICE descriptor type
@@ -32,7 +32,7 @@ ROM USB_DEVICE_DESCRIPTOR device_dsc=
 };
 
 /* Configuration 1 Descriptor */
-ROM BYTE configDescriptor1[]={
+const BYTE configDescriptor1[]={
     /* Configuration Descriptor */
     0x09,//sizeof(USB_CFG_DSC),    // Size of this descriptor in bytes
     USB_DESCRIPTOR_CONFIGURATION,                // CONFIGURATION descriptor type
@@ -118,31 +118,31 @@ ROM BYTE configDescriptor1[]={
 
 
 //Language code string descriptor
-ROM struct{BYTE bLength;BYTE bDscType;WORD string[1];}sd000={
+const struct{BYTE bLength;BYTE bDscType;WORD string[1];}sd000={
 sizeof(sd000),USB_DESCRIPTOR_STRING,{0x0409}};
 
 //Manufacturer string descriptor
-ROM struct{BYTE bLength;BYTE bDscType;WORD string[8];}sd001={
+const struct{BYTE bLength;BYTE bDscType;WORD string[8];}sd001={
 sizeof(sd001),USB_DESCRIPTOR_STRING,
 {'E','T','M','a','t','r','i','x' }};
 
 //Product string descriptor
-ROM struct{BYTE bLength;BYTE bDscType;WORD string[17];}sd002={
+const struct{BYTE bLength;BYTE bDscType;WORD string[17];}sd002={
 sizeof(sd002),USB_DESCRIPTOR_STRING,
 {'U','n','i','v','e','r','s','a','l',' ','C', 'h','a','r','g','e','r'}
 };
 
 //Array of configuration descriptors
-ROM BYTE *ROM USB_CD_Ptr[]=
+const BYTE *USB_CD_Ptr[]=
 {
-    (ROM BYTE *ROM)&configDescriptor1
+    (const BYTE *)&configDescriptor1
 };
 //Array of string descriptors
-ROM BYTE *ROM USB_SD_Ptr[USB_NUM_STRING_DESCRIPTORS]=
+const BYTE *USB_SD_Ptr[USB_NUM_STRING_DESCRIPTORS]=
 {
-    (ROM BYTE *ROM)&sd000,
-    (ROM BYTE *ROM)&sd001,
-    (ROM BYTE *ROM)&sd002
+    (const BYTE *)&sd000,
+    (const BYTE *)&sd001,
+    (const BYTE *)&sd002
 };
 
 #endif
