@@ -1,7 +1,11 @@
 #include <flash.h>
 
+#define BASE_FLASH 0x1F80
+
 void writeFlash(UINT16 iAddr, UINT16 iData)
 {
+    iAddr += BASE_FLASH;
+
     GIE = 0;        //disable interupts incase they interfere
     //ERASE SECTION
     PMCON1 = 0;     //not configuration space
@@ -39,6 +43,8 @@ void writeFlash(UINT16 iAddr, UINT16 iData)
 
 UINT16 readFlash(UINT16 iAddr)
 {
+    iAddr += BASE_FLASH;
+
     PMCON1 = 0;     //not configuration space
     PMADRL = iAddr&0xFF;
     PMADRH = (iAddr&0xFF00)>>8;
@@ -47,4 +53,3 @@ UINT16 readFlash(UINT16 iAddr)
     NOP();
     return (PMDATH<<8) | PMDATL;  //joins bytes & returns the value stored
 }
-

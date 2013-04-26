@@ -34,48 +34,79 @@
 #include <lcd.h>
 #include "flash.h"
 
-#define IDLE 0
+#define IDLE        0
 #define DISCHARGECC 1
-#define CHARGECC 2
-#define CHARGECV 3
+#define CHARGECC    2
+#define CHARGECV    3
 
 #define NICD 0
 #define NIMH 1
 #define LIPO 2
-#define SLA 3
+#define SLA  3
 
-#define MODEIDLE 0
-#define MODECHARGE 1
+#define MODEIDLE      0
+#define MODECHARGE    1
 #define MODEDISCHARGE 2
 
-#define MSGMAIN1 "Task select:    "
-#define MSGMAIN2 "Profile select  "
-#define MSGMAIN3 "Batt. charge    "
-#define MSGMAIN4 "Batt. discharge "
-#define MSGMAIN7 "Profile change  "
-#define MSGMAIN8 "PC management   "
-#define MSGMAIN9 "Volt calibr.    "
-#define MSGMAIN10 "Ampere calibr.  "
-#define MSGCHANGE1 "Chemistry:      "
-#define MSGCHANGE2 "Battery type    "
-#define MSGCHANGE3 "NiCd"
-#define MSGCHANGE4 "NiMh"
-#define MSGCHANGE5 "LiPo"
-#define MSGCHANGE6 "SLA "
-#define MSGCHANGE7 "Capacity:       "
-#define MSGCHANGE8 "mAh per cell    "
-#define MSGCHANGE9 "Cells:          "
-#define MSGCHANGE10 "Number of cells "
-#define MSGCHANGE11 "Charge:         "
-#define MSGCHANGE12 "mult. for capac."
-#define MSGCHANGE13 "Discharge:      "
-#define MSGCHANGE15 "Name:           "
-#define MSGPCMAN1 "PC serial link.."
-#define MSGDISCHARGE "Dsch."
-#define MSGCHARGE "Chrg."
-#define MSGEND "End!"
-#define MSGDISPLAY "Pack#"
-#define MSGINIT "Initializing... "
+#define PROFILE_SIZE 10
+
+// Address in EEPROM
+#define CHEMISTRY  0    //parameters position in a specific profile: Chemistry
+#define CAPACITY   1    //capacity in mAh/100, 255 -> 25500mAh
+#define CELLS      2    //Number of cells
+#define CHARGE     3    //charge in capacity units 255 -> 25.5*capacity
+#define DISCHARGE  4    //discharge in capacity units 255 -> 25.5*capacity
+#define INHIBIT    5    //Inhibit in minutes for delta peak check: 255 -> 255 min
+#define CUTOFF     6    //Cutoff in discharge
+#define CHARGE_CON 7    //deltav in charge for NiCd
+                        //deltav in charge for NiMh
+                        //max voltage in charge for LiPo
+                        //max voltage in charge for SLA
+#define FINALCURR  8    //final current (% of initial) for LiPo
+                        //final current (% of initial) for SLA
+#define TIMEOUT    9    //Timeout for charge
+
+// 120..128 eeprom spare
+#define PROFILE       119     //Position for the selected profile in EEPROM
+#define MAXCHARGE     118     //Maximum allowable charge current 255 -> 255A
+#define MAXDISCHARGE  117     //Maximum allowable discharge current 255 -> 255A
+#define R6H           116     //
+#define R6L           115     //R5=0..65535 in Ohm
+#define R5H           114     //
+#define R5L           113     //R6=0..65535 in Ohm
+#define CURR_H        112     //
+#define CURR_L        111     //current pick up sensitivity 0..65535 -> 65535uV/A
+#define MODE          110     //idle, charge or discharge mode, see below constants
+// 0..109 profiles PROFILE_SIZE*11 profiles
+
+#define MSGMAIN1      "Task select:    "
+#define MSGMAIN2      "Profile select  "
+#define MSGMAIN3      "Batt. charge    "
+#define MSGMAIN4      "Batt. discharge "
+#define MSGMAIN7      "Profile change  "
+#define MSGMAIN8      "PC management   "
+#define MSGMAIN9      "Volt calibr.    "
+#define MSGMAIN10     "Ampere calibr.  "
+#define MSGCHANGE1    "Chemistry:      "
+#define MSGCHANGE2    "Battery type    "
+#define MSGCHANGE3    "NiCd"
+#define MSGCHANGE4    "NiMh"
+#define MSGCHANGE5    "LiPo"
+#define MSGCHANGE6    "SLA "
+#define MSGCHANGE7    "Capacity:       "
+#define MSGCHANGE8    "mAh per cell    "
+#define MSGCHANGE9    "Cells:          "
+#define MSGCHANGE10   "Number of cells "
+#define MSGCHANGE11   "Charge:         "
+#define MSGCHANGE12   "mult. for capac."
+#define MSGCHANGE13   "Discharge:      "
+#define MSGCHANGE15   "Name:           "
+#define MSGPCMAN1     "PC serial link.."
+#define MSGDISCHARGE  "Dsch."
+#define MSGCHARGE     "Chrg."
+#define MSGEND        "End!"
+#define MSGDISPLAY    "Pack#"
+#define MSGINIT       "Initializing... "
 
 #define REPEATPERIOD 16
 
@@ -116,6 +147,9 @@ volatile UINT16 iTargC, iTargV;
 
 volatile BOOL bPwmErr;
 
+UINT8 iSelProf;
+UINT8 iCurrProfile;
+
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
 static __inline void __attribute__((always_inline)) initSystem(void);
 static __inline void __attribute__((always_inline)) processData(char);
@@ -123,8 +157,10 @@ void USBDeviceTasks(void);
 void USBCBSendResume(void);
 void __inline mainMenu(void);
 void static setPwm(void);
+void lcdProfile(void);
+void selProfile(void);
 
-void interrupt ISRCode()
+void interrupt interruptCode()
 {
     if(PIR1bits.TMR1IF)
     {
@@ -362,7 +398,7 @@ int main(void)
         switch(iMenuPos)
         {
             case 0:
-                // sel profile
+                selProfile();
                 break;
             case 1:
                 // charge
@@ -500,4 +536,89 @@ void __inline mainMenu(void)
     }while(!(iKeys & 0x03)); // if menu key is pressed exit
 }
 
-/** EOF main.c *************************************************/
+void lcdProfile()
+{
+    UINT8 iTmp;
+    char aiConvTmp[5];
+
+    lcdOut(128,MSGDISPLAY);
+    iTmp = iSelProf + 1;
+
+    itoa(aiConvTmp,iTmp,10);
+    lcdChar(133,aiConvTmp[1]);
+    lcdChar(134,aiConvTmp[2]);
+    lcdChar(135,':');
+    iTmp = readFlash(iCurrProfile+CHEMISTRY);
+
+    switch(iTmp)
+    {
+        case NICD:
+            lcdOut(136,MSGCHANGE3);
+            break;
+        case NIMH:
+            lcdOut(136,MSGCHANGE4);
+            break;
+        case LIPO:
+            lcdOut(136,MSGCHANGE5);
+            break;
+        case SLA:
+            lcdOut(136,MSGCHANGE6);
+            break;
+    }
+    lcdChar(141,'x');
+
+    iTmp = readFlash(iCurrProfile+CELLS);
+    itoa(aiConvTmp,iTmp,10);
+    lcdChar(142,aiConvTmp[1]);
+    lcdChar(143,aiConvTmp[2]);
+
+    iTmp = readFlash(iCurrProfile+CAPACITY);
+    itoa(aiConvTmp,iTmp*100,10);
+    lcdChar(192,'K');
+    lcdChar(193,aiConvTmp[0]);
+    lcdChar(194,aiConvTmp[1]);
+    lcdChar(195,aiConvTmp[2]);
+    lcdChar(196,aiConvTmp[3]);
+    lcdChar(197,aiConvTmp[4]);
+
+    iTmp = readFlash(iCurrProfile+CHARGE);
+    itoa(aiConvTmp,iTmp,10);
+    lcdChar(198,'C');
+    lcdChar(199,aiConvTmp[0]);
+    lcdChar(200,aiConvTmp[1]);
+    lcdChar(201,'.');
+    lcdChar(202,aiConvTmp[2]);
+
+    iTmp = readFlash(iCurrProfile+DISCHARGE);
+    itoa(aiConvTmp,iTmp,10);
+    lcdChar(203,'D');
+    lcdChar(204,aiConvTmp[0]);
+    lcdChar(205,aiConvTmp[1]);
+    lcdChar(206,'.');
+    lcdChar(207,aiConvTmp[2]);
+}
+
+void selProfile()
+{
+    iSelProf = readFlash(PROFILE);
+    do {
+        lcdProfile();
+        iKeys = 0;
+        while(!iKeys);
+        if(iKeys & 0x01)
+        {
+            iSelProf--;
+            if(iSelProf==0xff)
+                iSelProf = 0;
+            iCurrProfile = iSelProf * PROFILE_SIZE;
+        }
+        else if(iKeys & 0x02)
+        {
+            iSelProf++;
+            if(iSelProf==12)
+                iSelProf = 11;
+            iCurrProfile = iSelProf * PROFILE_SIZE;
+        }
+    }while(!(iKeys & 0x03));
+    writeFlash(PROFILE,iSelProf);
+}
