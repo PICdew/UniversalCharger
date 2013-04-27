@@ -70,10 +70,10 @@
 #define PROFILE       119     //Position for the selected profile in EEPROM
 #define MAXCHARGE     118     //Maximum allowable charge current 255 -> 255A
 #define MAXDISCHARGE  117     //Maximum allowable discharge current 255 -> 255A
-#define R6H           116     //
-#define R6L           115     //R5=0..65535 in Ohm
-#define R5H           114     //
-#define R5L           113     //R6=0..65535 in Ohm
+#define R6_H          116     //
+#define R6_L          115     //R5=0..65535 in Ohm
+#define R5_H          114     //
+#define R5_L          113     //R6=0..65535 in Ohm
 #define CURR_H        112     //
 #define CURR_L        111     //current pick up sensitivity 0..65535 -> 65535uV/A
 #define MODE          110     //idle, charge or discharge mode, see below constants
@@ -117,6 +117,9 @@
 #define REPEATSTART 200 // 5ms * 200
 #define KEYPRESSED  10  // 5ms * 10
 
+#define Highest(x) ((UINT8 *)&x)[3]
+#define Higher(x) ((UINT8 *)&x)[2];
+
 char asBuffIn[CDC_DATA_IN_EP_SIZE];
 char asBuffOut[CDC_DATA_OUT_EP_SIZE];
 
@@ -159,6 +162,8 @@ void __inline mainMenu(void);
 void static setPwm(void);
 void lcdProfile(void);
 void selProfile(void);
+UINT16 atoadu(UINT16);
+UINT16 adutoa(UINT16);
 
 void interrupt interruptCode()
 {
@@ -621,4 +626,49 @@ void selProfile()
         }
     }while(!(iKeys & 0x03));
     writeFlash(PROFILE,iSelProf);
+}
+
+//TODO capire costante 7629
+UINT16 atoadu(UINT16 i)
+{
+    UINT32 iCurr = readFlash(CURR_H) << 14 | readFlash(CURR_L);
+    return (i * iCurr) / 7629;
+}
+//TODO capire costante 7629
+UINT16 adutoa(UINT16 iADU)
+{
+    UINT32 iCurr = readFlash(CURR_H) << 14 | readFlash(CURR_L);
+    return (iADU * 7629) / iCurr;
+}
+
+//TODO capire costante 625
+UINT16 mvtoadu(UINT16 iMv)
+{
+    UINT16 iTmp, iTmp2;
+    UINT16 iR5 = readFlash(R5_H) << 8 | readFlash(R5_L);
+    UINT16 iR6 = readFlash(R6_H) << 8 | readFlash(R6_L);
+    iTmp = iR6 << 12;
+    iTmp2 = iR5 + iR6;
+    iTmp /= iTmp2;
+    iTmp = (iMv * iTmp) << 1;
+    return iTmp/625;
+}
+
+// TODO capire costante 53687
+UINT16 adutomv(UINT16 iADU)
+{
+    UINT16 iTmp;
+    UINT16 iR5 = readFlash(R5_H) << 8 | readFlash(R5_L);
+    UINT16 iR6 = readFlash(R6_H) << 8 | readFlash(R6_L);
+    iTmp = iR6 << 12;
+    iTmp = (4096+(iTmp/iR6)) * iADU;
+    return iTmp/53687;
+}
+
+// TODO capire costante 6944
+UINT16 recallmah()
+{
+    UINT32 iCurr = readFlash(CURR_H) << 14 | readFlash(CURR_L);
+
+    return ((iMAh >> 16) * 6944) / iCurr;
 }
