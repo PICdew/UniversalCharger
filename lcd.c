@@ -35,7 +35,7 @@ static void lcd8(UINT8 iData)
 void lcdClear(void)
 {
     lcd4(1,CMD);
-    __delay_ms(5);
+    __delay_ms(3);
 }
 
 void __inline lcdConfig(void)
@@ -59,18 +59,21 @@ void __inline lcdConfig(void)
         __delay_ms(10);
     lcd4(0x80,CMD);
     lcd4(32,DATA);
-    lcdClear();
 }
 
 void lcdOut(UINT8 iCmd, const char *sMsg)
 {
+    UINT8 iNdx;
+
     lcd4(iCmd,CMD);
-    while(sMsg++)
-        lcd4(*sMsg,DATA);
+    for(iNdx=0;sMsg[iNdx];iNdx++)
+        lcd4(sMsg[iNdx],DATA);
 }
 
 void lcdChar(UINT8 iCode,char iChar)
 {
+    if(!iChar)
+        iChar = ' ';
     lcd4(iCode,CMD);
     lcd4(iChar,DATA);
 }

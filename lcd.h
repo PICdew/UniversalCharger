@@ -8,5 +8,6 @@
 void __inline lcdConfig(void);
 void lcdOut(UINT8, const char *);
 void lcdChar(UINT8, char);
+void lcdClear(void);
 
 #endif	/* LCD_H */

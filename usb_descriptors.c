@@ -133,12 +133,12 @@ sizeof(sd002),USB_DESCRIPTOR_STRING,
 };
 
 //Array of configuration descriptors
-const BYTE *USB_CD_Ptr[]=
+ROM BYTE *ROM USB_CD_Ptr[]=
 {
     (const BYTE *)&configDescriptor1
 };
 //Array of string descriptors
-const BYTE *USB_SD_Ptr[USB_NUM_STRING_DESCRIPTORS]=
+ROM BYTE *ROM USB_SD_Ptr[USB_NUM_STRING_DESCRIPTORS]=
 {
     (const BYTE *)&sd000,
     (const BYTE *)&sd001,
