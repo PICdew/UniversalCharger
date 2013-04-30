@@ -48,6 +48,7 @@
 
 // Address in EEPROM for each profile
 #define CHEMISTRY  0    //parameters position in a specific profile: Chemistry
+// TODO se uso i 14bit 16384 -> 1638,400Ah
 #define CAPACITY   1    //capacity in mAh/100, 255 -> 25500mAh
 #define CELLS      2    //Number of cells
 #define CHARGE     3    //charge in capacity units 255 -> 25.5*capacity
@@ -112,15 +113,25 @@
 
 #define REPEATPERIOD 16
 
-#define KEYDOWN PORTAbits.RA5
-#define KEYUP PORTAbits.RA4
+#define KEYDOWN  PORTAbits.RA5
+#define KEYUP    PORTAbits.RA4
 #define KEYENTER PORTCbits.RC4
+
+#define KEYBITDOWN  1
+#define KEYBITUP    2
+#define KEYBITENTER 4
 
 #define REPEATSTART 200 // 5ms * 200
 #define KEYPRESSED  10  // 5ms * 10
 
-char asBuffIn[32];
-char asBuffOut[32];
+// da rivedere
+#define fanOn()  //RC1 = 1;
+#define fanOff() //RC1 = 0;
+
+UINT8 aiBuffIn[32];
+UINT8 aiBuffOut1[16];
+UINT8 aiBuffOut2[16];
+UINT8 *aiBuffOut;
 
 volatile INT16 iDutyPwmCharge;
 volatile INT16 iDutyPwmDischarge;
@@ -152,6 +163,9 @@ volatile BOOL bPwmErr;
 UINT8 iCurrProfile;
 volatile UINT8 iPosOut;
 
+BOOL bCalibrate;
+UINT8 iTypeBatt;
+
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
 static __inline void __attribute__((always_inline)) initSystem(void);
 static __inline void __attribute__((always_inline)) processData(char);
@@ -163,6 +177,7 @@ void lcdProfile(UINT8);
 void selProfile(void);
 UINT16 atoadu(UINT16);
 UINT16 adutoa(UINT16);
+void charge(void);
 
 void interrupt interruptCode()
 {
@@ -202,10 +217,10 @@ void interrupt interruptCode()
             if(iRepeatK1!=REPEATSTART)
             {
                 if(++iRepeatK1==KEYPRESSED)
-                    iKeys |= 0x01;
+                    iKeys |= KEYBITDOWN;
                 if(iRepeatK1==REPEATSTART)
                     if(bRepeatKey)
-                        iKeys |= 0x01;
+                        iKeys |= KEYBITDOWN;
             }
         }
         else
@@ -215,10 +230,10 @@ void interrupt interruptCode()
             if(iRepeatK2!=REPEATSTART)
             {
                 if(++iRepeatK2==KEYPRESSED)
-                    iKeys |= 0x02;
+                    iKeys |= KEYBITUP;
                 if(iRepeatK2==REPEATSTART)
                     if(bRepeatKey)
-                        iKeys |= 0x02;
+                        iKeys |= KEYBITUP;
             }
         }
         else
@@ -228,10 +243,10 @@ void interrupt interruptCode()
             if(iRepeatK3!=REPEATSTART)
             {
                 if(++iRepeatK3==KEYPRESSED)
-                    iKeys |= 0x04;
+                    iKeys |= KEYBITENTER;
                 if(iRepeatK3==REPEATSTART)
                     if(bRepeatKey)
-                        iKeys |= 0x04;
+                        iKeys |= KEYBITENTER;
             }
         }
         else
@@ -349,38 +364,68 @@ void interrupt interruptCode()
         }
         setPwm();
 
+        USBDeviceTasks();
         // Trasmissione seriale dei dati
         if(iAction!=0)
         {
-            /*iPosOut = 1;
-            switch(iSlowCnt&0xF)
+            iPosOut = iSlowCnt&0xF;
+            switch(iPosOut)
             {
                 case 0:
-                    asBuffOut[0] = 0x55;
+                    aiBuffOut[iPosOut] = 0x55;
                     break;
                 case 1:
-                    asBuffOut[0] = 0x56;
+                    aiBuffOut[iPosOut] = 0x55;
                     break;
                 case 2:
-                    asBuffOut[0] = 0x57;
+                    aiBuffOut[iPosOut] = 0x55;
                     break;
                 case 3:
-                    asBuffOut[0] = 0x58;
-                    //if(iAction==1)
+                {   // prepare buffer for output
+                    UINT16 iTmp,iTmp2;
+                    aiBuffOut[iPosOut] = 0x55;
+                    if(iAction==1)
+                    {
+                        iTmp = iSlowC - iZerC;
+                        iTmp2 = iDutyPwmDischarge;
+                    }
+                    else
+                    {
+                        iTmp = iZerC - iSlowC;
+                        iTmp2 = iDutyPwmCharge;
+                    }
+                    aiBuffOut[4] = iTmp2 >> 8;
+                    aiBuffOut[5] = iTmp2 & 0xFF;
+                    aiBuffOut[6] = iTmp >> 8;
+                    aiBuffOut[7] = iTmp & 0xFF;
+                    aiBuffOut[8] = iSlowV >> 8;
+                    aiBuffOut[9] = iSlowV & 0xFF;
+                    aiBuffOut[10] = iMAh >> 24;
+                    aiBuffOut[11] = (iMAh >> 16) & 0xFF;
+                    aiBuffOut[12] = (iMAh >> 8) & 0xFF;
+                    aiBuffOut[13] = iMAh & 0xFF;
                     break;
-                default:
-                    iPosOut = 0;
+                }
+                case 14:
+                    aiBuffOut[iPosOut] = iMin;
                     break;
-            }*/
+                case 15:
+                    aiBuffOut[iPosOut] = iSec;
+                    break;
+            }
         }
-        USBDeviceTasks();
         if(USBDeviceState >= CONFIGURED_STATE && USBSuspendControl!=1)
         {
-            if(USBUSARTIsTxTrfReady() && iPosOut>0)
-                putUSBUSART(asBuffOut, iPosOut);
+            if(USBUSARTIsTxTrfReady() && iPosOut==0xF)
+            {
+                putUSBUSART(aiBuffOut, iPosOut);
+                if(aiBuffOut==aiBuffOut1)  // switch buffer
+                    aiBuffOut = aiBuffOut2;
+                else
+                    aiBuffOut = aiBuffOut1;
+            }
             CDCTxService();
         }
-
         GIE = 1;
         //RC1 = 0;
     }
@@ -400,9 +445,7 @@ int main(void)
     {
         UINT8 iPrevMode = readFlash(MODE);
         if(iPrevMode==MODECHARGE)
-        {
-            //charge();
-        }
+            charge();
         else if(iPrevMode==MODEDISCHARGE)
         {
             //discharge();
@@ -440,26 +483,26 @@ int main(void)
             }
             iKeys = 0;
             while(!iKeys);
-            if(iKeys & 0x01) // Down Key
+            if(iKeys & KEYBITDOWN) // Down Key
             {
                 iMenuPos--;
                 if(iMenuPos<0)
                     iMenuPos = 0;
             }
-            else if(iKeys & 0x02) // Up key
+            else if(iKeys & KEYBITUP) // Up key
             {
                 iMenuPos++;
                 if(iMenuPos>=7)
                     iMenuPos = 6;
             }
-        }while(!(iKeys & 0x04)); // if menu key is pressed exit
+        }while(!(iKeys & KEYBITENTER)); // if menu key is pressed exit
         switch(iMenuPos)
         {
             case 0:
                 selProfile();
                 break;
             case 1:
-                // charge
+                charge();
                 break;
             case 2:
                 // discharge
@@ -513,7 +556,14 @@ static __inline void __attribute__((always_inline)) initSystem(void)
 
     INTCON = 0b01100000;
 
+    iRepeatK1 = 0;
+    iRepeatK2 = 0;
+    iRepeatK3 = 0;
     iAction = 0;
+    iDutyPwmCharge = 0;
+    iDutyPwmDischarge = 0;
+    bCalibrate = FALSE;
+    aiBuffOut = aiBuffOut1;
 
     lcdConfig();
     lcdClear();
@@ -645,21 +695,21 @@ void selProfile()
         lcdProfile(iSelProf);
         iKeys = 0;
         while(!iKeys);
-        if(iKeys & 0x01)
+        if(iKeys & KEYBITDOWN)
         {
             iSelProf--;
             if(iSelProf<0)
                 iSelProf = 0;
             iCurrProfile = iSelProf * PROFILE_SIZE;
         }
-        else if(iKeys & 0x02)
+        else if(iKeys & KEYBITUP)
         {
             iSelProf++;
             if(iSelProf>=11)
                 iSelProf = 10;
             iCurrProfile = iSelProf * PROFILE_SIZE;
         }
-    }while(!(iKeys & 0x04));
+    }while(!(iKeys & KEYBITENTER));
     writeFlash(PROFILE,iSelProf);
 }
 
@@ -706,4 +756,116 @@ UINT16 recallmah()
     UINT32 iCurr = readFlash(CURR_H) << 14 | readFlash(CURR_L);
 
     return ((iMAh >> 16) * 6944) / iCurr;
+}
+
+void prepDis(UINT8 iType)
+{
+    UINT16 iTmp, iCurr, iMaxCurr;
+
+    lcdOut(128,MSGINIT);
+    for(iTmp=0;iTmp<200;iTmp++)
+        __delay_ms(15);
+    iZerC = iSlowC;
+    lcdClear();
+    iTmp = readFlash(iCurrProfile+CAPACITY); // capacity divided by 100
+    if(!iType)
+        iCurr = readFlash(iCurrProfile+DISCHARGE);
+    else
+        iCurr = readFlash(iCurrProfile+CHARGE);
+    iCurr *= iTmp;
+    if(!iType)
+        iMaxCurr = readFlash(MAXDISCHARGE);
+    else
+        iMaxCurr = readFlash(MAXCHARGE);
+    iMaxCurr *= 100;
+    if(iCurr>iMaxCurr)
+        iCurr = iMaxCurr;
+    iTargC = atoadu(iCurr);
+    lcdChar(143,'A');
+    lcdChar(198,'V');
+    if(!bCalibrate)
+    {
+        if(!iType)
+            lcdOut(192,MSGDISCHARGE);
+        else
+            lcdOut(192,MSGCHARGE);
+        lcdChar(205,'m');
+        lcdChar(206,'A');
+        lcdChar(207,'h');
+    }
+    iTypeBatt = readFlash(iCurrProfile+CHEMISTRY);
+}
+void displ(UINT16 iADU)
+{
+    UINT16 iTmp;
+    char sBuff[6];
+
+    iTmp = adutoa(iADU);    //current display in format xx.xx
+    sprintf(sBuff,"%4d",iTmp);
+    lcdChar(138,sBuff[1]);
+    lcdChar(139,sBuff[2]);
+    lcdChar(140,'.');
+    lcdChar(141,sBuff[3]);
+    lcdChar(142,sBuff[4]);
+
+    iTmp = adutomv(iSlowV); //voltage display in format xx.xxx
+    sprintf(sBuff,"%5d",iTmp);
+    lcdChar(192,sBuff[0]);
+    lcdChar(193,sBuff[1]);
+    lcdChar(194,'.');
+    lcdChar(195,sBuff[2]);
+    lcdChar(196,sBuff[3]);
+    lcdChar(197,sBuff[4]);
+
+    if(!bCalibrate)
+    {
+        iTmp = recallmah();           //capacity display in format xxxxx
+        sprintf(sBuff,"%5d",iTmp);
+        lcdChar(200,sBuff[0]);
+        lcdChar(201,sBuff[1]);
+        lcdChar(202,sBuff[2]);
+        lcdChar(203,sBuff[3]);
+        lcdChar(204,sBuff[4]);
+    }
+}
+
+void charge()
+{
+    UINT8 iNumCell, iTimeout, iChargeConst, iInhi;
+    UINT16 iFinalC,iMv,iMaxCap;
+
+    lcdClear();
+    writeFlash(MODE,MODECHARGE);
+    fanOn();
+    prepDis(1);
+
+    iNumCell = readFlash(iCurrProfile+CELLS);
+    iTimeout = readFlash(iCurrProfile+TIMEOUT);
+    iChargeConst = readFlash(iCurrProfile+CHARGE_CON);
+    switch(iTypeBatt)
+    {
+        case NICD:
+            iInhi = readFlash(iCurrProfile+INHIBIT);
+            lcdOut(133,MSGCHANGE3);
+            iMv = iNumCell*iChargeConst;
+            break;
+        case NIMH:
+            iInhi = readFlash(iCurrProfile+INHIBIT);
+            lcdOut(133,MSGCHANGE4);
+            iMv = iNumCell*iChargeConst;
+            break;
+        case LIPO:
+            iFinalC = readFlash(iCurrProfile+FINALCURR);
+            lcdOut(133,MSGCHANGE5);
+            iMv = iNumCell*(3500+(iFinalC << 2));
+            break;
+        case SLA:
+            iFinalC = readFlash(iCurrProfile+FINALCURR);
+            lcdOut(133,MSGCHANGE6);
+            iMv = iNumCell*(2000+(iFinalC << 2));
+            break;
+    }
+    iTargV = mvtoadu(iMv);
+    iMaxCap = flashRead(iCurrProfile+CAPACITY) * iTimeout;
+    
 }
