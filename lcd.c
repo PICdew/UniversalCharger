@@ -35,7 +35,7 @@ static void lcd8(UINT8 iData)
 void lcdClear(void)
 {
     lcd4(1,CMD);
-    __delay_ms(3);
+    __delay_ms(2);
 }
 
 void __inline lcdConfig(void)

@@ -7,7 +7,7 @@
  ********************************************************************/
 #ifndef __USB_DESCRIPTORS_C
 #define __USB_DESCRIPTORS_C
- 
+
 /** INCLUDES *******************************************************/
 #include "./USB/usb.h"
 #include "./USB/usb_function_cdc.h"
@@ -35,17 +35,17 @@ const USB_DEVICE_DESCRIPTOR device_dsc=
 const BYTE configDescriptor1[]={
     /* Configuration Descriptor */
     0x09,//sizeof(USB_CFG_DSC),    // Size of this descriptor in bytes
-    USB_DESCRIPTOR_CONFIGURATION,                // CONFIGURATION descriptor type
+    USB_DESCRIPTOR_CONFIGURATION,  // CONFIGURATION descriptor type
     67,0,                   // Total length of data for this cfg
     2,                      // Number of interfaces in this cfg
     1,                      // Index value of this configuration
     0,                      // Configuration string index
-    _DEFAULT | _SELF,               // Attributes, see usb_device.h
+    _DEFAULT | _SELF,       // Attributes, see usb_device.h
     50,                     // Max power consumption (2X mA)
-							
+
     /* Interface Descriptor */
     9,//sizeof(USB_INTF_DSC),   // Size of this descriptor in bytes
-    USB_DESCRIPTOR_INTERFACE,               // INTERFACE descriptor type
+    USB_DESCRIPTOR_INTERFACE,   // INTERFACE descriptor type
     0,                      // Interface Number
     0,                      // Alternate Setting Number
     1,                      // Number of endpoints in this intf
@@ -81,14 +81,14 @@ const BYTE configDescriptor1[]={
     //sizeof(USB_EP_DSC),DSC_EP,_EP02_IN,_INT,CDC_INT_EP_SIZE,0x02,
     0x07,/*sizeof(USB_EP_DSC)*/
     USB_DESCRIPTOR_ENDPOINT,    //Endpoint Descriptor
-    _EP01_IN,            //EndpointAddress
-    _INTERRUPT,                       //Attributes
+    _EP01_IN,                   //EndpointAddress
+    _INTERRUPT,                 //Attributes
     0x08,0x00,                  //size
     0x02,                       //Interval
 
     /* Interface Descriptor */
     9,//sizeof(USB_INTF_DSC),   // Size of this descriptor in bytes
-    USB_DESCRIPTOR_INTERFACE,               // INTERFACE descriptor type
+    USB_DESCRIPTOR_INTERFACE,   // INTERFACE descriptor type
     1,                      // Interface Number
     0,                      // Alternate Setting Number
     2,                      // Number of endpoints in this intf
@@ -129,8 +129,7 @@ sizeof(sd001),USB_DESCRIPTOR_STRING,
 //Product string descriptor
 const struct{BYTE bLength;BYTE bDscType;WORD string[17];}sd002={
 sizeof(sd002),USB_DESCRIPTOR_STRING,
-{'U','n','i','v','e','r','s','a','l',' ','C', 'h','a','r','g','e','r'}
-};
+{'U','n','i','v','e','r','s','a','l',' ','C', 'h','a','r','g','e','r'}};
 
 //Array of configuration descriptors
 ROM BYTE *ROM USB_CD_Ptr[]=

@@ -6,7 +6,7 @@
  * RA4 UP Key IN e Pull-up
  * RA5 DOWN Key IN e Pull-up
  * RC0 RS LCD
- * RC1 SPARE da vedere forse per RW LCD(inutile) o FAN Cooler
+ * RC1 SPARE da vedere forse per FAN Cooler
  * RC2 AN6 (battery voltage multiplied by R6/(R5+R6)) (analog IN)
  * RC3 AN7 (current pickup) (analog IN)
  * RC4 OK ENTER Key IN (Pull-up esterno)
@@ -48,8 +48,8 @@
 
 // Address in EEPROM for each profile
 #define CHEMISTRY  0    //parameters position in a specific profile: Chemistry
-// TODO se uso i 14bit 16384 -> 1638,400Ah
-#define CAPACITY   1    //capacity in mAh/100, 255 -> 25500mAh
+// TODO se uso i 14bit 16384 -> 1638,400Ah forse inutile con 25,5 A per cella si arriva 150Ah con 6 celle
+#define CAPACITY   1    //capacity in mAh/100, 255 -> 25500mAh for Cell
 #define CELLS      2    //Number of cells
 #define CHARGE     3    //charge in capacity units 255 -> 25.5*capacity
 #define DISCHARGE  4    //discharge in capacity units 255 -> 25.5*capacity
@@ -178,6 +178,8 @@ void selProfile(void);
 UINT16 atoadu(UINT16);
 UINT16 adutoa(UINT16);
 void charge(void);
+void discharge(void);
+void pcmanage(void);
 
 void interrupt interruptCode()
 {
@@ -505,13 +507,13 @@ int main(void)
                 charge();
                 break;
             case 2:
-                // discharge
+                discharge();
                 break;
             case 3:
                 // changeprofile
                 break;
             case 4:
-                // pcmanage
+                pcmanage();
                 break;
             case 5:
                 // calibration 0
@@ -581,6 +583,7 @@ static __inline void __attribute__((always_inline)) initSystem(void)
         writeFlash(R5_L,0x98);           //default (152) R5=R5h*256+R5l = 47000 Ohm
         writeFlash(R6_H,0x2E);           //default (46)
         writeFlash(R6_L,0xE0);           //default (224) R6=R6h*256+R6l = 12000 Ohm
+        // TODO RIVEDERE IL DEFAULT
         writeFlash(CURR_H,97);           //default (97)
         writeFlash(CURR_L,168);          //default (168) Curr=Currh*256+Currl= 25000 -> 25000uv/A
         writeFlash(MODE,MODEIDLE);       //default mode (0) -> idle
@@ -831,8 +834,10 @@ void displ(UINT16 iADU)
 
 void charge()
 {
-    UINT8 iNumCell, iTimeout, iChargeConst, iInhi;
-    UINT16 iFinalC,iMv,iMaxCap;
+    UINT8 iNumCell, iTimeout, iChargeConst, iInhiFinalC;
+    UINT16 iMv,iMaxCap,iPeak,iLimit;
+    INT16 iTmp;
+    INT32 iTmp2;
 
     lcdClear();
     writeFlash(MODE,MODECHARGE);
@@ -845,27 +850,161 @@ void charge()
     switch(iTypeBatt)
     {
         case NICD:
-            iInhi = readFlash(iCurrProfile+INHIBIT);
+            iInhiFinalC = readFlash(iCurrProfile+INHIBIT);
             lcdOut(133,MSGCHANGE3);
             iMv = iNumCell*iChargeConst;
             break;
         case NIMH:
-            iInhi = readFlash(iCurrProfile+INHIBIT);
+            iInhiFinalC = readFlash(iCurrProfile+INHIBIT);
             lcdOut(133,MSGCHANGE4);
             iMv = iNumCell*iChargeConst;
             break;
         case LIPO:
-            iFinalC = readFlash(iCurrProfile+FINALCURR);
+            iInhiFinalC = readFlash(iCurrProfile+FINALCURR);
             lcdOut(133,MSGCHANGE5);
-            iMv = iNumCell*(3500+(iFinalC << 2));
+            iMv = iNumCell*(3500+(iChargeConst << 2));
             break;
         case SLA:
-            iFinalC = readFlash(iCurrProfile+FINALCURR);
+            iInhiFinalC = readFlash(iCurrProfile+FINALCURR);
             lcdOut(133,MSGCHANGE6);
-            iMv = iNumCell*(2000+(iFinalC << 2));
+            iMv = iNumCell*(2000+(iChargeConst << 2));
             break;
     }
     iTargV = mvtoadu(iMv);
-    iMaxCap = flashRead(iCurrProfile+CAPACITY) * iTimeout;
-    
+    iMaxCap = readFlash(iCurrProfile+CAPACITY) * iTimeout;
+
+    iTmp2 = iTargC * iInhiFinalC;
+    iLimit = iTmp2 / 100;
+
+    iAction = CHARGECC;
+    iMAh = 0;
+    iSec = 0;
+    iMin = 0;
+    iKeys = 0;
+    iPeak = 0;
+    bPwmErr = FALSE;
+    do {
+        iTmp = iZerC - iSlowC;
+        if(iTmp<0)
+            iTmp = 0;
+        displ(iTmp);
+        switch(iTypeBatt)
+        {
+            case NICD:
+            case NIMH:
+                if(iMin>iInhiFinalC)
+                {
+                    GIE = 0;
+                    if(iSlowV>iPeak)
+                        iPeak = iSlowV;
+                    iTmp = iPeak - iSlowV;
+                    GIE = 1;
+                    if(iTmp < 0)
+                        iTmp = 0;
+                    if(iTmp > iTargV)
+                        iAction = IDLE;
+                }
+            case LIPO:
+            case SLA:
+                GIE = 0;
+                if(iAction==CHARGECC)
+                    if(iSlowV>iTargV)
+                        iAction = CHARGECV; //if LiXX charge stops the CC charge at max voltage
+                if(iAction==CHARGECV)
+                    if(iTmp<iLimit)
+                        iAction = IDLE;//stops the charge if under final current
+                GIE = 1;
+        }
+        if(recallmah()>iMaxCap || bPwmErr)
+            iAction = IDLE;
+    }while(iAction!=IDLE && !(iKeys & KEYBITENTER));
+    iAction = IDLE;
+    writeFlash(MODE,MODEIDLE);
+    lcdOut(133,MSGEND);
+    iSec = 0;
+    iKeys = 0;
+    do {
+        GIE = 0;
+        iTmp = iZerC - iSlowC;
+        GIE = 1;
+        if(iTmp<0)
+            iTmp = 0;
+        displ(iTmp);
+    }while(!(iKeys & KEYBITENTER));
+    fanOff();
+}
+void discharge()
+{
+    UINT8 iCutOff,iNumCell, iTimeout, iChargeConst, iInhiFinalC;
+    UINT16 iMv,iMaxCap,iPeak,iLimit;
+    INT16 iTmp;
+    INT32 iTmp2;
+
+    lcdClear();
+    writeFlash(MODE,MODEDISCHARGE);
+    fanOn();
+    prepDis(0);
+    iCutOff = readFlash(iCurrProfile+CUTOFF);
+    switch(iTypeBatt)
+    {
+        case NICD:
+            lcdOut(133,MSGCHANGE3);
+            iTmp = iCutOff * 10;
+            break;
+        case NIMH:
+            lcdOut(133,MSGCHANGE4);
+            iTmp = iCutOff * 10;
+            break;
+        case LIPO:
+            lcdOut(133,MSGCHANGE5);
+            iTmp = 2500+(iCutOff << 2);
+            break;
+        case SLA:
+            lcdOut(133,MSGCHANGE6);
+            iTmp = 1500+(iCutOff << 2);
+            break;
+    }
+    iNumCell = readFlash(iCurrProfile+CELLS);
+    iTargV = mvtoadu(iNumCell*iTmp);
+    iAction = DISCHARGECC;
+    iMAh = 0;
+    iSec = 0;
+    iMin = 0;
+    iKeys = 0;
+    bPwmErr = FALSE;
+    do {
+        GIE = 0;
+        iTmp = iSlowC - iZerC;
+        GIE = 1;
+        if(iTmp<0)
+            iTmp = 0;
+        displ(iTmp);
+        GIE = 0;
+        if(bPwmErr || iFastV<iTargV)
+            iAction = IDLE;
+        GIE = 1;
+    }while(iAction!=IDLE && !(iKeys & KEYBITENTER));
+    iAction = IDLE;
+    writeFlash(MODE,MODEIDLE);
+    lcdOut(133,MSGEND);
+    iSec = 0;
+    iKeys = 0;
+    do {
+        GIE = 0;
+        iTmp = iSlowC - iZerC;
+        GIE = 1;
+        if(iTmp<0)
+            iTmp = 0;
+        displ(iTmp);
+    }while(!(iKeys & KEYBITENTER));
+    fanOff();
+}
+void pcmanage()
+{
+    lcdClear();
+    lcdOut(128,MSGPCMAN1);
+    iKeys = 0;
+    do {
+        
+    }while(iKeys==0);
 }

@@ -920,7 +920,7 @@ end;
 //===============================================================================================================================================
 // Charge routine
 //===============================================================================================================================================
-
+********************* OK ****************************
 procedure charge;
 begin
 
@@ -966,7 +966,7 @@ begin
 
   j:=eeprom_read(profile_point+pcapacity);                                      //j holds the capacity divided by 100 -> 40 = 4000mAh
   maxcap:=j*m;                                                                  //maxcap holds the timeout-> cap*timeout=capacity for timeout escape
------------
+
   tlw:=target_current*n;
   ilim:=tlw/100;                                                                //ilim holds the value of current for end of charge in the CV phase
 
@@ -1032,7 +1032,7 @@ end;
 //===============================================================================================================================================
 // Discharge routine
 //===============================================================================================================================================
-
+******************** OK ********************************
 procedure discharge;
 begin
 
@@ -1106,7 +1106,7 @@ begin
   
 end;
 
-
+--------------
 //===============================================================================================================================================
 // PC management for internal parameters -> xx00.AAAA,xx01.BBBB,xx10.CCCC,1x11.DDDD -> write CCCC.DDDD at address AAAA.BBBB
 // PC management for internal parameters -> xx00.AAAA,xx01.BBBB,xx10.xxxx,0011.xxxx -> read from address AAAA.BBBB
