@@ -24,12 +24,12 @@
 
 #include <configwords.h>
 #include "GenericTypeDefs.h"
-#include "Compiler.h"
-#include "usb_config.h"
-#include "./USB/usb.h"
-#include "./USB/usb_function_cdc.h"
+//#include "Compiler.h"
+//#include "usb_config.h"
+#include "USB/usb.h"
+#include "USB/usb_function_cdc.h"
 
-#include "HardwareProfile.h"
+//#include "HardwareProfile.h"
 
 #include <lcd.h>
 #include "flash.h"
@@ -445,7 +445,7 @@ int main(void)
         __delay_ms(10);
     if(iTmp==255)
     {
-        UINT8 iPrevMode = readFlash(MODE);
+        UINT8 iPrevMode = readEEPROM(MODE);
         if(iPrevMode==MODECHARGE)
             charge();
         else if(iPrevMode==MODEDISCHARGE)
@@ -453,7 +453,7 @@ int main(void)
             //discharge();
         }
     }
-    writeFlash(MODE,MODEIDLE);
+    writeEEPROM(MODE,MODEIDLE);
     iMenuPos = 0;
     while(TRUE)
     {
@@ -528,10 +528,13 @@ int main(void)
 static __inline void __attribute__((always_inline)) initSystem(void)
 {
     UINT8 iTmp;
-
+    #if defined(_PIC14E)
     ANSELA = 0x00;
     ANSELB = 0x00;
     ANSELC = 0x0C; // RC2 RC3 analog
+    #else
+    #warning "analogic pin definition missing"
+    #endif
 
     TRISA = 0b110000; // RA4 RA5 input
     TRISB = 0;
@@ -541,6 +544,7 @@ static __inline void __attribute__((always_inline)) initSystem(void)
     LATB = 0;
     LATC = 0;
 
+    #if defined(_PIC14E)
     OPTION_REG = 0b01010111; // Weak Pull-up, prescaler 256 assigned to TIMER0
     WPUA = 0b00110000; // RA4 e RA5 pull-up enabled for button
 
@@ -549,10 +553,17 @@ static __inline void __attribute__((always_inline)) initSystem(void)
 
     while(!OSCSTATbits.HFIOFR);
     while(!OSCSTATbits.PLLRDY);
+    #else
+    #warning "check init for pic18f"
+    #endif
 
     PR2 = 0xFF;
+    #if defined(_PIC14E)
     PWM1DCH = 0;
     PWM2DCH = 0;
+    #else
+    #warning "PWM init missing"
+    #endif
 
     ADCON1 = 0xF0; // FRC & VDD
 
@@ -571,44 +582,44 @@ static __inline void __attribute__((always_inline)) initSystem(void)
     lcdClear();
 
     iCurrProfile = 0;
-    if((iTmp = (readFlash(PROFILE)&0xFF))==0xFF)
+    if((iTmp = (readEEPROM(PROFILE)&0xFF))==0xFF)
     {
         UINT8 iNdx;
 
         lcdOut(128,MSGINIT);
-        writeFlash(PROFILE,0);           //Default profile selected (0) -> 1st profile
-        writeFlash(MAXCHARGE,5);         //Default max charge current (5) -> 5A
-        writeFlash(MAXDISCHARGE,5);      //Default max discharge current (20) -> 20A
-        writeFlash(R5_H,0xB7);           //default (183)
-        writeFlash(R5_L,0x98);           //default (152) R5=R5h*256+R5l = 47000 Ohm
-        writeFlash(R6_H,0x2E);           //default (46)
-        writeFlash(R6_L,0xE0);           //default (224) R6=R6h*256+R6l = 12000 Ohm
+        writeEEPROM(PROFILE,0);           //Default profile selected (0) -> 1st profile
+        writeEEPROM(MAXCHARGE,5);         //Default max charge current (5) -> 5A
+        writeEEPROM(MAXDISCHARGE,5);      //Default max discharge current (20) -> 20A
+        writeEEPROM(R5_H,0xB7);           //default (183)
+        writeEEPROM(R5_L,0x98);           //default (152) R5=R5h*256+R5l = 47000 Ohm
+        writeEEPROM(R6_H,0x2E);           //default (46)
+        writeEEPROM(R6_L,0xE0);           //default (224) R6=R6h*256+R6l = 12000 Ohm
         // TODO RIVEDERE IL DEFAULT
-        writeFlash(CURR_H,97);           //default (97)
-        writeFlash(CURR_L,168);          //default (168) Curr=Currh*256+Currl= 25000 -> 25000uv/A
-        writeFlash(MODE,MODEIDLE);       //default mode (0) -> idle
+        writeEEPROM(CURR_H,97);           //default (97)
+        writeEEPROM(CURR_L,168);          //default (168) Curr=Currh*256+Currl= 25000 -> 25000uv/A
+        writeEEPROM(MODE,MODEIDLE);       //default mode (0) -> idle
         for(iNdx=0;iNdx<11;iNdx++)
         {
             UINT8 iNdx2;
             iNdx2 = iNdx*PROFILE_SIZE;
 
-            writeFlash(iNdx2+CHEMISTRY,0);          //Default NiCd (0) -> 0:NiCd, 1:NiMh, 2:LiPo, 3:SLA
-            writeFlash(iNdx2+CAPACITY,10);          //Default cells capacity (10) -> 10*100=1000mAh
-            writeFlash(iNdx2+CELLS,1);              //Deafult number of cells (6) -> 6
-            writeFlash(iNdx2+CHARGE,1);             //default charge (1) -> 1000*1.0=1A
-            writeFlash(iNdx2+DISCHARGE,1);          //default discharge (1) -> 1000*1.0=10A
-            writeFlash(iNdx2+INHIBIT,5);            //default deltapeak check inhibition (5) -> 5 minutes
-            writeFlash(iNdx2+CUTOFF,10);            //default NiCd cutoff (80) -> 80*10=800mV
+            writeEEPROM(iNdx2+CHEMISTRY,0);          //Default NiCd (0) -> 0:NiCd, 1:NiMh, 2:LiPo, 3:SLA
+            writeEEPROM(iNdx2+CAPACITY,10);          //Default cells capacity (10) -> 10*100=1000mAh
+            writeEEPROM(iNdx2+CELLS,1);              //Deafult number of cells (6) -> 6
+            writeEEPROM(iNdx2+CHARGE,1);             //default charge (1) -> 1000*1.0=1A
+            writeEEPROM(iNdx2+DISCHARGE,1);          //default discharge (1) -> 1000*1.0=10A
+            writeEEPROM(iNdx2+INHIBIT,5);            //default deltapeak check inhibition (5) -> 5 minutes
+            writeEEPROM(iNdx2+CUTOFF,10);            //default NiCd cutoff (80) -> 80*10=800mV
                                                     //default NiMh cutoff (100) -> 100*10=1000mV
                                                     //default LiPo cutoff (125) -> 2500+125*4=3000mV
                                                     //default SLA cutoff (125) -> 1500+125*4=2000mV
-            writeFlash(iNdx2+CHARGE_CON,10);        //default NiCd deltapeak (10) -> 10mV
+            writeEEPROM(iNdx2+CHARGE_CON,10);        //default NiCd deltapeak (10) -> 10mV
                                                     //default NiMh deltapeak (5) -> 5mV
                                                     //default LiPo max voltage (175) -> 3500+175*4=4200mV
                                                     //default SLA max voltage (125) -> 2000+125*4=2500mV
-            writeFlash(iNdx2+FINALCURR,5);          //default LiPo final current (5) -> 3000*5/100=150mA
+            writeEEPROM(iNdx2+FINALCURR,5);          //default LiPo final current (5) -> 3000*5/100=150mA
                                                     //default SLA final current (5) -> 3000*5/100=150mA
-            writeFlash(iNdx2+TIMEOUT,120);          //default cell max charge (120) -> 3000*120/100=3600mAh
+            writeEEPROM(iNdx2+TIMEOUT,120);          //default cell max charge (120) -> 3000*120/100=3600mAh
         }
     }
     else
@@ -621,11 +632,15 @@ static __inline void __attribute__((always_inline)) initSystem(void)
 
 void static setPwm(void)
 {
+    #if defined(_PIC14E)
     PWM1DCL = (iDutyPwmCharge & 0x03) << 6;
     PWM1DCH = (iDutyPwmCharge >> 2) & 0xFF;
 
     PWM2DCL = (iDutyPwmDischarge & 0x03) << 6;
     PWM2DCH = (iDutyPwmDischarge >> 2) & 0xFF;
+    #else
+    #warning "setPwm 18F missing"
+    #endif
 }
 
 void lcdProfile(UINT8 iSelProf)
@@ -640,7 +655,7 @@ void lcdProfile(UINT8 iSelProf)
     lcdChar(133,aiConvTmp[0]);
     lcdChar(134,aiConvTmp[1]);
     lcdChar(135,':');
-    iTmp = readFlash(iCurrProfile+CHEMISTRY);
+    iTmp = readEEPROM(iCurrProfile+CHEMISTRY);
 
     switch(iTmp)
     {
@@ -659,12 +674,12 @@ void lcdProfile(UINT8 iSelProf)
     }
     lcdChar(141,'x');
 
-    iTmp = readFlash(iCurrProfile+CELLS);
+    iTmp = readEEPROM(iCurrProfile+CELLS);
     sprintf(aiConvTmp,"%2d",iTmp);
     lcdChar(142,aiConvTmp[0]);
     lcdChar(143,aiConvTmp[1]);
 
-    iTmp = readFlash(iCurrProfile+CAPACITY);
+    iTmp = readEEPROM(iCurrProfile+CAPACITY);
     sprintf(aiConvTmp,"%5d",iTmp*100);
     lcdChar(192,'K');
     lcdChar(193,aiConvTmp[0]);
@@ -673,7 +688,7 @@ void lcdProfile(UINT8 iSelProf)
     lcdChar(196,aiConvTmp[3]);
     lcdChar(197,aiConvTmp[4]);
 
-    iTmp = readFlash(iCurrProfile+CHARGE);
+    iTmp = readEEPROM(iCurrProfile+CHARGE);
     sprintf(aiConvTmp,"%3d",iTmp);
     lcdChar(198,'C');
     lcdChar(199,aiConvTmp[0]);
@@ -681,7 +696,7 @@ void lcdProfile(UINT8 iSelProf)
     lcdChar(201,'.');
     lcdChar(202,aiConvTmp[2]);
 
-    iTmp = readFlash(iCurrProfile+DISCHARGE);
+    iTmp = readEEPROM(iCurrProfile+DISCHARGE);
     sprintf(aiConvTmp,"%3d",iTmp);
     lcdChar(203,'D');
     lcdChar(204,aiConvTmp[0]);
@@ -693,7 +708,7 @@ void lcdProfile(UINT8 iSelProf)
 void selProfile()
 {
     INT8 iSelProf;
-    iSelProf = readFlash(PROFILE);
+    iSelProf = readEEPROM(PROFILE);
     do {
         lcdProfile(iSelProf);
         iKeys = 0;
@@ -713,19 +728,19 @@ void selProfile()
             iCurrProfile = iSelProf * PROFILE_SIZE;
         }
     }while(!(iKeys & KEYBITENTER));
-    writeFlash(PROFILE,iSelProf);
+    writeEEPROM(PROFILE,iSelProf);
 }
 
 //TODO capire costante 7629
 UINT16 atoadu(UINT16 i)
 {
-    UINT32 iCurr = readFlash(CURR_H) << 14 | readFlash(CURR_L);
+    UINT32 iCurr = readEEPROM(CURR_H) << 14 | readEEPROM(CURR_L);
     return (i * iCurr) / 7629;
 }
 //TODO capire costante 7629
 UINT16 adutoa(UINT16 iADU)
 {
-    UINT32 iCurr = readFlash(CURR_H) << 14 | readFlash(CURR_L);
+    UINT32 iCurr = readEEPROM(CURR_H) << 14 | readEEPROM(CURR_L);
     return (iADU * 7629) / iCurr;
 }
 
@@ -733,8 +748,8 @@ UINT16 adutoa(UINT16 iADU)
 UINT16 mvtoadu(UINT16 iMv)
 {
     UINT16 iTmp, iTmp2;
-    UINT16 iR5 = readFlash(R5_H) << 8 | readFlash(R5_L);
-    UINT16 iR6 = readFlash(R6_H) << 8 | readFlash(R6_L);
+    UINT16 iR5 = readEEPROM(R5_H) << 8 | readEEPROM(R5_L);
+    UINT16 iR6 = readEEPROM(R6_H) << 8 | readEEPROM(R6_L);
     iTmp = iR6 << 12;
     iTmp2 = iR5 + iR6;
     iTmp /= iTmp2;
@@ -746,8 +761,8 @@ UINT16 mvtoadu(UINT16 iMv)
 UINT16 adutomv(UINT16 iADU)
 {
     UINT16 iTmp;
-    UINT16 iR5 = readFlash(R5_H) << 8 | readFlash(R5_L);
-    UINT16 iR6 = readFlash(R6_H) << 8 | readFlash(R6_L);
+    UINT16 iR5 = readEEPROM(R5_H) << 8 | readEEPROM(R5_L);
+    UINT16 iR6 = readEEPROM(R6_H) << 8 | readEEPROM(R6_L);
     iTmp = iR5 << 12;
     iTmp = (4096+(iTmp/iR6)) * iADU;
     return iTmp/53687;
@@ -756,7 +771,7 @@ UINT16 adutomv(UINT16 iADU)
 // TODO capire costante 6944
 UINT16 recallmah()
 {
-    UINT32 iCurr = readFlash(CURR_H) << 14 | readFlash(CURR_L);
+    UINT32 iCurr = readEEPROM(CURR_H) << 14 | readEEPROM(CURR_L);
 
     return ((iMAh >> 16) * 6944) / iCurr;
 }
@@ -770,16 +785,16 @@ void prepDis(UINT8 iType)
         __delay_ms(15);
     iZerC = iSlowC;
     lcdClear();
-    iTmp = readFlash(iCurrProfile+CAPACITY); // capacity divided by 100
+    iTmp = readEEPROM(iCurrProfile+CAPACITY); // capacity divided by 100
     if(!iType)
-        iCurr = readFlash(iCurrProfile+DISCHARGE);
+        iCurr = readEEPROM(iCurrProfile+DISCHARGE);
     else
-        iCurr = readFlash(iCurrProfile+CHARGE);
+        iCurr = readEEPROM(iCurrProfile+CHARGE);
     iCurr *= iTmp;
     if(!iType)
-        iMaxCurr = readFlash(MAXDISCHARGE);
+        iMaxCurr = readEEPROM(MAXDISCHARGE);
     else
-        iMaxCurr = readFlash(MAXCHARGE);
+        iMaxCurr = readEEPROM(MAXCHARGE);
     iMaxCurr *= 100;
     if(iCurr>iMaxCurr)
         iCurr = iMaxCurr;
@@ -796,7 +811,7 @@ void prepDis(UINT8 iType)
         lcdChar(206,'A');
         lcdChar(207,'h');
     }
-    iTypeBatt = readFlash(iCurrProfile+CHEMISTRY);
+    iTypeBatt = readEEPROM(iCurrProfile+CHEMISTRY);
 }
 void displ(UINT16 iADU)
 {
@@ -840,38 +855,38 @@ void charge()
     INT32 iTmp2;
 
     lcdClear();
-    writeFlash(MODE,MODECHARGE);
+    writeEEPROM(MODE,MODECHARGE);
     fanOn();
     prepDis(1);
 
-    iNumCell = readFlash(iCurrProfile+CELLS);
-    iTimeout = readFlash(iCurrProfile+TIMEOUT);
-    iChargeConst = readFlash(iCurrProfile+CHARGE_CON);
+    iNumCell = readEEPROM(iCurrProfile+CELLS);
+    iTimeout = readEEPROM(iCurrProfile+TIMEOUT);
+    iChargeConst = readEEPROM(iCurrProfile+CHARGE_CON);
     switch(iTypeBatt)
     {
         case NICD:
-            iInhiFinalC = readFlash(iCurrProfile+INHIBIT);
+            iInhiFinalC = readEEPROM(iCurrProfile+INHIBIT);
             lcdOut(133,MSGCHANGE3);
             iMv = iNumCell*iChargeConst;
             break;
         case NIMH:
-            iInhiFinalC = readFlash(iCurrProfile+INHIBIT);
+            iInhiFinalC = readEEPROM(iCurrProfile+INHIBIT);
             lcdOut(133,MSGCHANGE4);
             iMv = iNumCell*iChargeConst;
             break;
         case LIPO:
-            iInhiFinalC = readFlash(iCurrProfile+FINALCURR);
+            iInhiFinalC = readEEPROM(iCurrProfile+FINALCURR);
             lcdOut(133,MSGCHANGE5);
             iMv = iNumCell*(3500+(iChargeConst << 2));
             break;
         case SLA:
-            iInhiFinalC = readFlash(iCurrProfile+FINALCURR);
+            iInhiFinalC = readEEPROM(iCurrProfile+FINALCURR);
             lcdOut(133,MSGCHANGE6);
             iMv = iNumCell*(2000+(iChargeConst << 2));
             break;
     }
     iTargV = mvtoadu(iMv);
-    iMaxCap = readFlash(iCurrProfile+CAPACITY) * iTimeout;
+    iMaxCap = readEEPROM(iCurrProfile+CAPACITY) * iTimeout;
 
     iTmp2 = iTargC * iInhiFinalC;
     iLimit = iTmp2 / 100;
@@ -919,7 +934,7 @@ void charge()
             iAction = IDLE;
     }while(iAction!=IDLE && !(iKeys & KEYBITENTER));
     iAction = IDLE;
-    writeFlash(MODE,MODEIDLE);
+    writeEEPROM(MODE,MODEIDLE);
     lcdOut(133,MSGEND);
     iSec = 0;
     iKeys = 0;
@@ -935,16 +950,14 @@ void charge()
 }
 void discharge()
 {
-    UINT8 iCutOff,iNumCell, iTimeout, iChargeConst, iInhiFinalC;
-    UINT16 iMv,iMaxCap,iPeak,iLimit;
+    UINT8 iCutOff,iNumCell;
     INT16 iTmp;
-    INT32 iTmp2;
 
     lcdClear();
-    writeFlash(MODE,MODEDISCHARGE);
+    writeEEPROM(MODE,MODEDISCHARGE);
     fanOn();
     prepDis(0);
-    iCutOff = readFlash(iCurrProfile+CUTOFF);
+    iCutOff = readEEPROM(iCurrProfile+CUTOFF);
     switch(iTypeBatt)
     {
         case NICD:
@@ -964,7 +977,7 @@ void discharge()
             iTmp = 1500+(iCutOff << 2);
             break;
     }
-    iNumCell = readFlash(iCurrProfile+CELLS);
+    iNumCell = readEEPROM(iCurrProfile+CELLS);
     iTargV = mvtoadu(iNumCell*iTmp);
     iAction = DISCHARGECC;
     iMAh = 0;
@@ -985,7 +998,7 @@ void discharge()
         GIE = 1;
     }while(iAction!=IDLE && !(iKeys & KEYBITENTER));
     iAction = IDLE;
-    writeFlash(MODE,MODEIDLE);
+    writeEEPROM(MODE,MODEIDLE);
     lcdOut(133,MSGEND);
     iSec = 0;
     iKeys = 0;

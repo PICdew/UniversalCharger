@@ -4,7 +4,7 @@
 #include "GenericTypeDefs.h"
 #include "Compiler.h"
 
-void writeFlash(UINT16, UINT16);
-UINT16 readFlash(UINT16);
+void writeEEPROM(UINT16, UINT16);
+UINT16 readEEPROM(UINT16);
 
 #endif	/* FLASH_H */

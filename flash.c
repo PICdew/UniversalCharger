@@ -4,8 +4,9 @@
 
 #define FLASH
 
-void writeFlash(UINT16 iAddr, UINT16 iData)
+void writeEEPROM(UINT16 iAddr, UINT16 iData)
 {
+    #if defined(_PIC14E)
     UINT16 iBase;
     UINT16 aiBackup[32];
     UINT8 iNdx;
@@ -13,7 +14,7 @@ void writeFlash(UINT16 iAddr, UINT16 iData)
     // Backup row 32 bytes
     iBase = (iAddr >> 5) * 0x20;
     for(iNdx=0;iNdx<32;iNdx++)
-        aiBackup[iNdx] = readFlash(iBase+iNdx);
+        aiBackup[iNdx] = readEEPROM(iBase+iNdx);
     aiBackup[iAddr-iBase] = iData;
     //iAddr += BASE_FLASH;
     iBase += BASE_FLASH;
@@ -58,10 +59,14 @@ void writeFlash(UINT16 iAddr, UINT16 iData)
     //END OF WRITE SECTION
     GIE = 1;        //enable interupts again
     #endif
+    #else
+    #warning "writeEEPROM missing"
+    #endif
 }
 
-UINT16 readFlash(UINT16 iAddr)
+UINT16 readEEPROM(UINT16 iAddr)
 {
+    #if defined(_PIC14E)
     iAddr += BASE_FLASH;
 
     PMCON1 = 0;     //not configuration space
@@ -71,4 +76,8 @@ UINT16 readFlash(UINT16 iAddr)
     NOP();
     NOP();
     return (PMDATH<<8) | PMDATL;  //joins bytes & returns the value stored
+    #else
+    #warning "readEEPROM missing"
+    return 0;
+    #endif
 }
