@@ -2,23 +2,24 @@
 
 #define BASE_FLASH 0x1F80
 
-#define FLASH
+#define REAL_FLASH
 
-void writeEEPROM(UINT16 iAddr, UINT16 iData)
+#warning "writeEEPROM should be check the write and return BOOL"
+void writeEEPROM(UINT8 iAddr, UINT16 iData)
 {
     #if defined(_PIC14E)
     UINT16 iBase;
     UINT16 aiBackup[32];
     UINT8 iNdx;
-    #if defined(FLASH)
+    #if defined(REAL_FLASH)
     // Backup row 32 bytes
     iBase = (iAddr >> 5) * 0x20;
     for(iNdx=0;iNdx<32;iNdx++)
         aiBackup[iNdx] = readEEPROM(iBase+iNdx);
     aiBackup[iAddr-iBase] = iData;
-    //iAddr += BASE_FLASH;
     iBase += BASE_FLASH;
 
+    #warning "review disable/enable interrupt too many for a simple write"
     GIE = 0;        //disable interupts incase they interfere
     //ERASE SECTION
     PMCON1 = 0;     //not configuration space
@@ -60,24 +61,42 @@ void writeEEPROM(UINT16 iAddr, UINT16 iData)
     GIE = 1;        //enable interupts again
     #endif
     #else
-    #warning "writeEEPROM missing"
+    EEDATA = (UINT8)iData;
+    EEADR = iAddr;
+    // start write sequence as described in datasheet, page 91
+    EECON1bits.EEPGD = 0;
+    EECON1bits.CFGS = 0;
+    EECON1bits.WREN = 1; // enable writes to data EEPROM
+    GIE = 0;  // disable interrupts
+    EECON2 = 0x55;
+    EECON2 = 0x0AA;
+    EECON1bits.WR = 1;   // start writing
+    while(EECON1bits.WR){}
+    //if(EECON1bits.WRERR){
+    EECON1bits.WREN = 0;
+    GIE = 1;  // enable interrupts
     #endif
 }
 
-UINT16 readEEPROM(UINT16 iAddr)
+#warning "readEEPROM should be return UINT8"
+UINT16 readEEPROM(UINT8 iAddr)
 {
     #if defined(_PIC14E)
-    iAddr += BASE_FLASH;
+    UINT16 iRealAddr;
+    iRealAddr = BASE_FLASH + iAddr;
 
     PMCON1 = 0;     //not configuration space
-    PMADRL = iAddr&0xFF;
-    PMADRH = iAddr>>8;
+    PMADRL = iRealAddr&0xFF;
+    PMADRH = iRealAddr>>8;
     RD = 1;         //initiate read operation
     NOP();
     NOP();
     return (PMDATH<<8) | PMDATL;  //joins bytes & returns the value stored
     #else
-    #warning "readEEPROM missing"
-    return 0;
+    EEADR = iAddr;
+    EECON1bits.CFGS = 0;
+    EECON1bits.EEPGD = 0;
+    EECON1bits.RD = 1;
+    return EEDATA;
     #endif
 }

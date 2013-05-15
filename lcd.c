@@ -1,7 +1,7 @@
 #include <lcd.h>
 
-#define LCD_RS PORTCbits.RC0
 #define LCD_E  PORTCbits.RC7
+#define LCD_RS PORTCbits.RC0
 
 #define CMD 0
 #define DATA 1
@@ -11,12 +11,14 @@ static void lcd8(UINT8);
 
 static void lcd4(UINT8 iData,UINT8 iRS)
 {
+    UINT8 iTmp;
     LCD_RS = iRS; // 0 command, 1 data
 
-    PORTB = iData & 0xF0;
+    iTmp = PORTB & 0x0F;
+    PORTB = iTmp|(iData & 0xF0);
     LCD_E = 1;
     LCD_E = 0;
-    PORTB = (iData & 0x0F) << 4;
+    PORTB = iTmp|((iData & 0x0F) << 4);
     LCD_E = 1;
     LCD_E = 0;
     __delay_ms(1);
@@ -24,9 +26,11 @@ static void lcd4(UINT8 iData,UINT8 iRS)
 
 static void lcd8(UINT8 iData)
 {
+    UINT8 iTmp;
     LCD_RS = 0; // command
 
-    PORTB = iData & 0xF0;
+    iTmp = PORTB & 0x0F;
+    PORTB = iTmp|(iData & 0xF0);
     LCD_E = 1;
     LCD_E = 0;
     __delay_ms(1);

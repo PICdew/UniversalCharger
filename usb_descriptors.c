@@ -9,8 +9,8 @@
 #define __USB_DESCRIPTORS_C
 
 /** INCLUDES *******************************************************/
-#include "./USB/usb.h"
-#include "./USB/usb_function_cdc.h"
+#include "USB/usb.h"
+#include "USB/usb_function_cdc.h"
 
 /* Device Descriptor */
 const USB_DEVICE_DESCRIPTOR device_dsc=

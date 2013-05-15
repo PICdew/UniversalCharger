@@ -1,5 +1,7 @@
 /* PIN MAPPING
  *
+ * // PIC16F1459
+ *
  * RA0 USB D+ / ICSPDAT
  * RA1 USB D- / ICSPCLK
  * RA3 SPARE da vedere perchè è VPP
@@ -20,16 +22,42 @@
  *
  * BUZZER mancante rispetto all'originale
  *
+ * // PIC18F2550
+ *
+ * RA0 AN0 (battery voltage multiplied by R6/(R5+R6)) (analog IN)
+ * RA1 AN1 (current pickup) (analog IN)
+ * RA2 spare
+ * RA3 spare
+ * RA4 spare (NO Buzzer)
+ * RA5 spare
+ * RC0 RS LCD
+ * RC1 PWM2 DISCHARGE OUT
+ * RC2 PWM1 CHARGE OUT
+ * RC4 D-
+ * RC5 D+
+ * RC6 FAN Controller (OUT)
+ * RC7 E LCD OUT
+ * RB0 UP Key IN e Pull-up
+ * RB1 DOWN Key IN e Pull-up
+ * RB2 OK ENTER Key IN e Pull-up
+ * RB3 spare
+ * RB4 D4 LCD
+ * RB5 D5 LCD
+ * RB6 D6 LCD
+ * RB7 D7 LCD
+ *
+ * Timer0
+ * - overflow every 5ms (4,992) for check operations (charge/discharge)
+ *
+ * Timer2
+ * - used for PWMs
+ * 
  */
 
 #include <configwords.h>
 #include "GenericTypeDefs.h"
-//#include "Compiler.h"
-//#include "usb_config.h"
 #include "USB/usb.h"
 #include "USB/usb_function_cdc.h"
-
-//#include "HardwareProfile.h"
 
 #include <lcd.h>
 #include "flash.h"
@@ -113,9 +141,15 @@
 
 #define REPEATPERIOD 16
 
+#if defined(_PIC14E)
 #define KEYDOWN  PORTAbits.RA5
 #define KEYUP    PORTAbits.RA4
 #define KEYENTER PORTCbits.RC4
+#else
+#define KEYDOWN  PORTBbits.RB1
+#define KEYUP    PORTBbits.RB0
+#define KEYENTER PORTBbits.RB2
+#endif
 
 #define KEYBITDOWN  1
 #define KEYBITUP    2
@@ -171,8 +205,7 @@ static __inline void __attribute__((always_inline)) initSystem(void);
 static __inline void __attribute__((always_inline)) processData(char);
 void USBDeviceTasks(void);
 void USBCBSendResume(void);
-//void __inline mainMenu(void);
-void static setPwm(void);
+void __inline static setPwm(void);
 void lcdProfile(UINT8);
 void selProfile(void);
 UINT16 atoadu(UINT16);
@@ -255,7 +288,11 @@ void interrupt interruptCode()
             iRepeatK3 = 0;
 
         iTmp = 0;
+        #if defined(_PIC14E)
         ADCON0 = 0x19; // AN6
+        #else
+        ADCON0 = 1; // AN0
+        #endif
         __delay_us(5);
         for(iNdx=0;iNdx<63;iNdx++)
         {
@@ -268,7 +305,11 @@ void interrupt interruptCode()
         iAccV += iTmp;
 
         iTmp = 0;
+        #if defined(_PIC14E)
         ADCON0 = 0x1D; // AN7
+        #else
+        ADCON0 = 0x5; // AN1
+        #endif
         __delay_us(5);
         for(iNdx=0;iNdx<63;iNdx++)
         {
@@ -449,9 +490,7 @@ int main(void)
         if(iPrevMode==MODECHARGE)
             charge();
         else if(iPrevMode==MODEDISCHARGE)
-        {
-            //discharge();
-        }
+            discharge();
     }
     writeEEPROM(MODE,MODEIDLE);
     iMenuPos = 0;
@@ -532,19 +571,11 @@ static __inline void __attribute__((always_inline)) initSystem(void)
     ANSELA = 0x00;
     ANSELB = 0x00;
     ANSELC = 0x0C; // RC2 RC3 analog
-    #else
-    #warning "analogic pin definition missing"
-    #endif
 
     TRISA = 0b110000; // RA4 RA5 input
     TRISB = 0;
     TRISC = 0b00011100; // RC2 RC3 RC4 input
 
-    LATA = 0;
-    LATB = 0;
-    LATC = 0;
-
-    #if defined(_PIC14E)
     OPTION_REG = 0b01010111; // Weak Pull-up, prescaler 256 assigned to TIMER0
     WPUA = 0b00110000; // RA4 e RA5 pull-up enabled for button
 
@@ -553,21 +584,37 @@ static __inline void __attribute__((always_inline)) initSystem(void)
 
     while(!OSCSTATbits.HFIOFR);
     while(!OSCSTATbits.PLLRDY);
-    #else
-    #warning "check init for pic18f"
-    #endif
 
-    PR2 = 0xFF;
-    #if defined(_PIC14E)
     PWM1DCH = 0;
     PWM2DCH = 0;
+    ADCON1 = 0xF0; // FRC & VDD
+    #warning "timer2 config missing"
+    INTCON = 0b01100000;
     #else
-    #warning "PWM init missing"
+    TRISA = 0b00000011; // RA0 RA1 input
+    TRISB = 0b00000111; // RB0 RB1 RB2 input
+    TRISC = 0;
+
+    ADCON0 = 0x01; // enable ADC
+    ADCON1 = 0x0D; // AN0 AN1 analog
+    ADCON2 = 0x0b10110110; // 16TAD Fosc/64
+    #warning "timer2 see for prescaler test with pwm"
+    INTCON = 0x20; // overflow Timer0
+    T2CON = 0x4; // timer2 on with no pre/post scaler
+    T0CON = 0b11000111; // timer0 8 bit ON with 256 prescaler
+
+    CCP1CON = 0xC; // PWM Mode
+    CCP2CON = 0xC; // PWM Mode
+
+    CCPR1L = 0x0;
+    CCPR2L = 0x0;
     #endif
 
-    ADCON1 = 0xF0; // FRC & VDD
+    LATA = 0;
+    LATB = 0;
+    LATC = 0;
 
-    INTCON = 0b01100000;
+    PR2 = 0xFF;
 
     iRepeatK1 = 0;
     iRepeatK2 = 0;
@@ -630,7 +677,7 @@ static __inline void __attribute__((always_inline)) initSystem(void)
     lcdOut(192,MSGHELLO2);
 }
 
-void static setPwm(void)
+void __inline static setPwm(void)
 {
     #if defined(_PIC14E)
     PWM1DCL = (iDutyPwmCharge & 0x03) << 6;
@@ -639,7 +686,11 @@ void static setPwm(void)
     PWM2DCL = (iDutyPwmDischarge & 0x03) << 6;
     PWM2DCH = (iDutyPwmDischarge >> 2) & 0xFF;
     #else
-    #warning "setPwm 18F missing"
+    CCPR1L = iDutyPwmCharge >> 2;
+    CCP1CONbits.DC1B = iDutyPwmCharge & 0x03;
+
+    CCPR2L = iDutyPwmDischarge >> 2;
+    CCP2CONbits.DC2B = iDutyPwmDischarge & 0x03;
     #endif
 }
 
@@ -1012,6 +1063,7 @@ void discharge()
     }while(!(iKeys & KEYBITENTER));
     fanOff();
 }
+
 void pcmanage()
 {
     lcdClear();

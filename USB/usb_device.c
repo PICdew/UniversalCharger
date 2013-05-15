@@ -562,15 +562,15 @@ void USBDeviceInit(void)
     USBDeferOUTDataStagePackets = FALSE;
     USBBusIsSuspended = FALSE;
 
-	//Initialize all pBDTEntryIn[] and pBDTEntryOut[]
-	//pointers to NULL, so they don't get used inadvertently.  
-	for(i = 0; i < (BYTE)(USB_MAX_EP_NUMBER+1u); i++)
-	{
-		pBDTEntryIn[i] = 0u;
-		pBDTEntryOut[i] = 0u;		
-		ep_data_in[i].Val = 0u;
+    //Initialize all pBDTEntryIn[] and pBDTEntryOut[]
+    //pointers to NULL, so they don't get used inadvertently.  
+    for(i = 0; i < (BYTE)(USB_MAX_EP_NUMBER+1u); i++)
+    {
+        pBDTEntryIn[i] = 0u;
+        pBDTEntryOut[i] = 0u;		
+        ep_data_in[i].Val = 0u;
         ep_data_out[i].Val = 0u;
-	}
+    }
 
     //Get ready for the first packet
     pBDTEntryIn[0] = (volatile BDT_ENTRY*)&BDT[EP0_IN_EVEN];

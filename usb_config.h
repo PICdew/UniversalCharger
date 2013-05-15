@@ -1,13 +1,13 @@
-//#ifndef USBCFG_H
-//#define USBCFG_H
+#ifndef USBCFG_H
+#define USBCFG_H
 
 /** DEFINITIONS ****************************************************/
-#define USB_EP0_BUFF_SIZE		8	// Valid Options: 8, 16, 32, or 64 bytes.
-						// Using larger options take more SRAM, but
-						// does not provide much advantage in most types
-						// of applications.  Exceptions to this, are applications
-						// that use EP0 IN or OUT for sending large amounts of
-						// application related data.
+#define USB_EP0_BUFF_SIZE	8	// Valid Options: 8, 16, 32, or 64 bytes.
+					// Using larger options take more SRAM, but
+					// does not provide much advantage in most types
+					// of applications.  Exceptions to this, are applications
+					// that use EP0 IN or OUT for sending large amounts of
+					// application related data.
 
 #define USB_MAX_NUM_INT     	2   // For tracking Alternate Setting
 
@@ -117,11 +117,11 @@
 
 #define CDC_DATA_INTF_ID        0x01
 #define CDC_DATA_EP             2
-#define CDC_DATA_OUT_EP_SIZE    64
-#define CDC_DATA_IN_EP_SIZE     64
+#define CDC_DATA_OUT_EP_SIZE    32
+#define CDC_DATA_IN_EP_SIZE     32
 
 //#define USB_CDC_SUPPORT_ABSTRACT_CONTROL_MANAGEMENT_CAPABILITIES_D2 //Send_Break command
 #define USB_CDC_SUPPORT_ABSTRACT_CONTROL_MANAGEMENT_CAPABILITIES_D1 //Set_Line_Coding, Set_Control_Line_State, Get_Line_Coding, and Serial_State commands
 /** DEFINITIONS ****************************************************/
 
-//#endif //USBCFG_H
+#endif //USBCFG_H
