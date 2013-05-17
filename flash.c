@@ -5,7 +5,7 @@
 #define REAL_FLASH
 
 #warning "writeEEPROM should be check the write and return BOOL"
-void writeEEPROM(UINT8 iAddr, UINT16 iData)
+void writeEEPROM(UINT8 iAddr, UINT8 iData)
 {
     #if defined(_PIC14E)
     UINT16 iBase;
@@ -69,7 +69,7 @@ void writeEEPROM(UINT8 iAddr, UINT16 iData)
     EECON1bits.WREN = 1; // enable writes to data EEPROM
     GIE = 0;  // disable interrupts
     EECON2 = 0x55;
-    EECON2 = 0x0AA;
+    EECON2 = 0xAA;
     EECON1bits.WR = 1;   // start writing
     while(EECON1bits.WR){}
     //if(EECON1bits.WRERR){
@@ -78,8 +78,7 @@ void writeEEPROM(UINT8 iAddr, UINT16 iData)
     #endif
 }
 
-#warning "readEEPROM should be return UINT8"
-UINT16 readEEPROM(UINT8 iAddr)
+UINT8 readEEPROM(UINT8 iAddr)
 {
     #if defined(_PIC14E)
     UINT16 iRealAddr;

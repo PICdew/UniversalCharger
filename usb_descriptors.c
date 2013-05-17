@@ -96,7 +96,7 @@ const BYTE configDescriptor1[]={
     0,                      // Subclass code
     NO_PROTOCOL,            // Protocol code
     0,                      // Interface string index
-    
+ 
     /* Endpoint Descriptor */
     //sizeof(USB_EP_DSC),DSC_EP,_EP03_OUT,_BULK,CDC_BULK_OUT_EP_SIZE,0x00,
     0x07,/*sizeof(USB_EP_DSC)*/

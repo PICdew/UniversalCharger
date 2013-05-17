@@ -76,7 +76,6 @@
 
 // Address in EEPROM for each profile
 #define CHEMISTRY  0    //parameters position in a specific profile: Chemistry
-// TODO se uso i 14bit 16384 -> 1638,400Ah forse inutile con 25,5 A per cella si arriva 150Ah con 6 celle
 #define CAPACITY   1    //capacity in mAh/100, 255 -> 25500mAh for Cell
 #define CELLS      2    //Number of cells
 #define CHARGE     3    //charge in capacity units 255 -> 25.5*capacity
@@ -213,6 +212,10 @@ UINT16 adutoa(UINT16);
 void charge(void);
 void discharge(void);
 void pcmanage(void);
+void changeProfile();
+static void limitVal(UINT8,UINT8,UINT8,UINT8);
+static void limitVal16(UINT8,UINT8);
+void calibration(BOOL);
 
 void interrupt interruptCode()
 {
@@ -549,16 +552,16 @@ int main(void)
                 discharge();
                 break;
             case 3:
-                // changeprofile
+                changeProfile();
                 break;
             case 4:
                 pcmanage();
                 break;
             case 5:
-                // calibration 0
+                calibration(FALSE);
                 break;
             case 6:
-                // calibration 1
+                calibration(TRUE);
                 break;
         }
     }
@@ -1066,10 +1069,246 @@ void discharge()
 
 void pcmanage()
 {
+    UINT8 iCount,iAddr,iValue;
+
+    iCount = 0;
     lcdClear();
     lcdOut(128,MSGPCMAN1);
     iKeys = 0;
     do {
-        
+        if(getsUSBUSART(aiBuffIn, 1)>0)
+        {
+            switch((aiBuffIn[0] & 0x30) >> 4)
+            {
+                case 0:
+                    if(iCount==0)
+                    {
+                        iCount++;
+                        iAddr = (aiBuffIn[0] & 0x0F) << 4;
+                    }
+                    else
+                        iCount = 0;
+                    break;
+                case 1:
+                    if(iCount==1)
+                    {
+                        iCount++;
+                        iAddr &= (aiBuffIn[0] & 0x0F);
+                    }
+                    else
+                        iCount = 0;
+                    break;
+                case 2:
+                    if(iCount==2)
+                    {
+                        iCount++;
+                        iValue = (aiBuffIn[0] & 0x0F) << 4;
+                    }
+                    else
+                        iCount = 0;
+                    break;
+                case 3:
+                    if(iCount==3)
+                    {
+                        iCount++;
+                        iValue &= (aiBuffIn[0] & 0x0F);
+                        if(aiBuffIn[0] & 0x80)
+                            writeEEPROM(iAddr,iValue);
+                        else
+                        {
+                            aiBuffOut[0] = readEEPROM(iAddr);
+                            putUSBUSART(aiBuffOut, 1);
+                        }
+                    }
+                    else
+                        iCount = 0;
+                    break;
+            }
+        }
+        CDCTxService();
     }while(iKeys==0);
+}
+
+void changeProfile()
+{
+    UINT8 iSelItem;
+    UINT16 iTmp;
+    char aiConvTmp[6];
+
+    iSelItem = 0;
+    iKeys = 0;
+    do {
+        switch(iSelItem)
+        {
+            case 0:
+                lcdOut(128,MSGCHANGE1);
+                lcdOut(192,MSGCHANGE2);
+                switch(readEEPROM(iCurrProfile+CHEMISTRY))
+                {
+                    case NICD:
+                        lcdOut(139,MSGCHANGE3);
+                        break;
+                    case NIMH:
+                        lcdOut(139,MSGCHANGE4);
+                        break;
+                    case LIPO:
+                        lcdOut(139,MSGCHANGE5);
+                        break;
+                    case SLA:
+                        lcdOut(139,MSGCHANGE6);
+                        break;
+                }
+                break;
+            case 1:
+                lcdOut(128,MSGCHANGE7);
+                lcdOut(192,MSGCHANGE8);
+                iTmp = readEEPROM(iCurrProfile+CAPACITY) * 100;
+                sprintf(aiConvTmp,"%5d",iTmp);
+                lcdChar(138,aiConvTmp[0]);
+                lcdChar(139,aiConvTmp[1]);
+                lcdChar(140,aiConvTmp[2]);
+                lcdChar(141,aiConvTmp[3]);
+                lcdChar(142,aiConvTmp[4]);
+                break;
+            case 2:
+                lcdOut(128,MSGCHANGE9);
+                lcdOut(192,MSGCHANGE10);
+                sprintf(aiConvTmp,"%2d",readEEPROM(iCurrProfile+CELLS));
+                lcdChar(135,aiConvTmp[0]);
+                lcdChar(136,aiConvTmp[1]);
+                break;
+            case 3:
+                lcdOut(128,MSGCHANGE11);
+                lcdOut(192,MSGCHANGE12);
+                sprintf(aiConvTmp,"%3d",readEEPROM(iCurrProfile+CHARGE));
+                lcdChar(136,aiConvTmp[0]);
+                lcdChar(137,aiConvTmp[1]);
+                lcdChar(138,'.');
+                lcdChar(139,aiConvTmp[2]);
+                break;
+            case 4:
+                lcdOut(128,MSGCHANGE13);
+                lcdOut(192,MSGCHANGE12);
+                sprintf(aiConvTmp,"%3d",readEEPROM(iCurrProfile+DISCHARGE));
+                lcdChar(136,aiConvTmp[0]);
+                lcdChar(137,aiConvTmp[1]);
+                lcdChar(138,'.');
+                lcdChar(139,aiConvTmp[2]);
+                break;
+        }
+        iKeys = 0;
+        while(!iKeys);
+        if(iKeys & KEYBITDOWN) // Down Key
+        {
+            switch(iSelItem)
+            {
+                case 0:
+                    limitVal(iCurrProfile+CHEMISTRY,255,0,0);
+                    break;
+                case 1:
+                    limitVal(iCurrProfile+CAPACITY,0,1,0);
+                    break;
+                case 2:
+                    limitVal(iCurrProfile+CELLS,0,1,0);
+                    break;
+                case 3:
+                    limitVal(iCurrProfile+CHARGE,0,1,0);
+                    break;
+                case 4:
+                    limitVal(iCurrProfile+DISCHARGE,0,1,0);
+                    break;
+            }
+        }
+        else if(iKeys & KEYBITUP) // Up Key
+        {
+            switch(iSelItem)
+            {
+                case 0:
+                    limitVal(iCurrProfile+CHEMISTRY,4,3,1);
+                    break;
+                case 1:
+                    limitVal(iCurrProfile+CAPACITY,0,255,1);
+                    break;
+                case 2:
+                    limitVal(iCurrProfile+CELLS,20,19,1);
+                    break;
+                case 3:
+                    limitVal(iCurrProfile+CHARGE,0,255,1);
+                    break;
+                case 4:
+                    limitVal(iCurrProfile+DISCHARGE,0,255,1);
+                    break;
+            }
+        }
+        else if(iKeys & KEYBITENTER) // Enter Key
+            iSelItem++;
+    }while(!(iKeys & KEYBITENTER) && iSelItem!=5);
+}
+
+static void limitVal(UINT8 iAddr,UINT8 iLimit,UINT8 iValue,UINT8 iDirection)
+{
+    UINT8 iTmp;
+
+    iTmp = readEEPROM(iAddr);
+    if(!iDirection)
+        iTmp--;
+    else
+        iTmp++;
+    if(iTmp==iLimit)
+        iTmp = iValue;
+    writeEEPROM(iAddr,iTmp);
+}
+
+static void limitVal16(UINT8 iAddr,UINT8 iDirection)
+{
+    UINT16 iTmp;
+
+    iTmp = readEEPROM(iAddr);
+    iAddr++;
+    iTmp |= (readEEPROM(iAddr) << 8);
+    if(iDirection)
+        iTmp -= 10;
+    else
+        iTmp += 10;
+    writeEEPROM(iAddr,iTmp >> 8);
+    iAddr--;
+    writeEEPROM(iAddr,iTmp & 0xFF);
+}
+
+void calibration(BOOL bCharge)
+{
+    UINT8 iAddr;
+    INT16 iTmp;
+
+    lcdClear();
+    bCalibrate = TRUE;
+    fanOn();
+    prepDis(2);
+    iTargC = atoadu(200);
+    if(!bCharge)
+    {
+        iAction = IDLE;
+        iAddr = R6_L;
+    }
+    else
+    {
+        iAction = CHARGECC;
+        iAddr = CURR_L;
+    }
+    iKeys = 0;
+    do {
+        GIE = 0;
+        iTmp = iZerC-iSlowC;
+        GIE = 1;
+        if(iTmp<0)
+            iTmp = 0;
+        displ(iTmp);
+        if(iKeys & KEYBITDOWN) // Down Key
+            limitVal16(iAddr,0);
+        else if(iKeys & KEYBITUP) // Up Key
+            limitVal16(iAddr,1);
+    }while(!(iKeys & KEYBITENTER));
+    iAction = IDLE;
+    bCalibrate = FALSE;
+    fanOff();
 }

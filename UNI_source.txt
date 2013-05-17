@@ -1106,7 +1106,6 @@ begin
   
 end;
 
---------------
 //===============================================================================================================================================
 // PC management for internal parameters -> xx00.AAAA,xx01.BBBB,xx10.CCCC,1x11.DDDD -> write CCCC.DDDD at address AAAA.BBBB
 // PC management for internal parameters -> xx00.AAAA,xx01.BBBB,xx10.xxxx,0011.xxxx -> read from address AAAA.BBBB
@@ -1420,6 +1419,8 @@ begin
   dec(eevar);
   eeprom_write(eevar,lo(tw));
 end;
+
+--------------
 
 //===============================================================================================================================================
 // Calibration procedure (Volt and Ampere)
