@@ -508,13 +508,13 @@ void USBDeviceInit(void)
 
     // Clear all USB error flags
     USBClearInterruptRegister(U1EIR);  
-       
+ 
     // Clears all USB interrupts          
     USBClearInterruptRegister(U1IR); 
 
     //Clear all of the endpoint control registers
     U1EP0 = 0;
-    
+ 
     DisableNonZeroEndpoints(USB_MAX_EP_NUMBER);
 
     SetConfigurationOptions();
@@ -576,7 +576,7 @@ void USBDeviceInit(void)
     pBDTEntryIn[0] = (volatile BDT_ENTRY*)&BDT[EP0_IN_EVEN];
     // Initialize EP0 as a Ctrl EP
     U1EP0 = EP_CTRL|USB_HANDSHAKE_ENABLED;        
-	//Prepare for the first SETUP on EP0 OUT
+    //Prepare for the first SETUP on EP0 OUT
     BDT[EP0_OUT_EVEN].ADR = ConvertToPhysicalAddress(&SetupPkt);
     BDT[EP0_OUT_EVEN].CNT = USB_EP0_BUFF_SIZE;
     BDT[EP0_OUT_EVEN].STAT.Val = _USIE|_DAT0|_BSTALL;

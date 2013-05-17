@@ -1,7 +1,6 @@
 #include <flash.h>
 
 #define BASE_FLASH 0x1F80
-
 #define REAL_FLASH
 
 #warning "writeEEPROM should be check the write and return BOOL"
@@ -99,3 +98,4 @@ UINT8 readEEPROM(UINT8 iAddr)
     return EEDATA;
     #endif
 }
+

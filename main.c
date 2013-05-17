@@ -90,16 +90,17 @@
                         //final current (% of initial) for SLA
 #define TIMEOUT    9    //Timeout for charge
 
-// 120..128 eeprom spare
-#define PROFILE       119     //Position for the selected profile in EEPROM
-#define MAXCHARGE     118     //Maximum allowable charge current 255 -> 255A
-#define MAXDISCHARGE  117     //Maximum allowable discharge current 255 -> 255A
-#define R6_H          116     //
-#define R6_L          115     //R5=0..65535 in Ohm
-#define R5_H          114     //
-#define R5_L          113     //R6=0..65535 in Ohm
-#define CURR_H        112     //
-#define CURR_L        111     //current pick up sensitivity 0..268435456 -> 268435456uV/A
+// 121..128 eeprom spare
+#define PROFILE       120     //Position for the selected profile in EEPROM
+#define MAXCHARGE     119     //Maximum allowable charge current 255 -> 255A
+#define MAXDISCHARGE  118     //Maximum allowable discharge current 255 -> 255A
+#define R6_H          117     //
+#define R6_L          116     //R5=0..65535 in Ohm
+#define R5_H          115     //
+#define R5_L          114     //R6=0..65535 in Ohm
+#define CURR_H        113     //
+#define CURR_M        112     //
+#define CURR_L        111     //current pick up sensitivity 0..16777216 -> 16777216 uV/A
 #define MODE          110     //idle, charge or discharge mode, see below constants
 // 0..109 profiles PROFILE_SIZE*11 profiles
 
@@ -157,9 +158,8 @@
 #define REPEATSTART 200 // 5ms * 200
 #define KEYPRESSED  10  // 5ms * 10
 
-// da rivedere
-#define fanOn()  //RC1 = 1;
-#define fanOff() //RC1 = 0;
+#define fanOn()  PORTCbits.RC6 = 1
+#define fanOff() PORTCbits.RC6 = 0
 
 UINT8 aiBuffIn[32];
 UINT8 aiBuffOut1[16];
@@ -214,7 +214,7 @@ void discharge(void);
 void pcmanage(void);
 void changeProfile();
 static void limitVal(UINT8,UINT8,UINT8,UINT8);
-static void limitVal16(UINT8,UINT8);
+static void limitValX(UINT8,UINT8,BOOL);
 void calibration(BOOL);
 
 void interrupt interruptCode()
@@ -617,7 +617,7 @@ static __inline void __attribute__((always_inline)) initSystem(void)
     LATB = 0;
     LATC = 0;
 
-    PR2 = 0xFF;
+    //PR2 = 0xFF;
 
     iRepeatK1 = 0;
     iRepeatK2 = 0;
@@ -645,8 +645,9 @@ static __inline void __attribute__((always_inline)) initSystem(void)
         writeEEPROM(R6_H,0x2E);           //default (46)
         writeEEPROM(R6_L,0xE0);           //default (224) R6=R6h*256+R6l = 12000 Ohm
         // TODO RIVEDERE IL DEFAULT
-        writeEEPROM(CURR_H,97);           //default (97)
-        writeEEPROM(CURR_L,168);          //default (168) Curr=Currh*256+Currl= 25000 -> 25000uv/A
+        writeEEPROM(CURR_H,9);            //default (0)
+        writeEEPROM(CURR_M,0x4E);         //default (97)
+        writeEEPROM(CURR_L,0xD0);         //default (168) 610000 -> 610000uv/A
         writeEEPROM(MODE,MODEIDLE);       //default mode (0) -> idle
         for(iNdx=0;iNdx<11;iNdx++)
         {
@@ -786,15 +787,15 @@ void selProfile()
 }
 
 //TODO capire costante 7629
-UINT16 atoadu(UINT16 i)
+UINT16 atoadu(UINT16 iA)
 {
-    UINT32 iCurr = readEEPROM(CURR_H) << 14 | readEEPROM(CURR_L);
-    return (i * iCurr) / 7629;
+    UINT32 iCurr = ((UINT32)readEEPROM(CURR_H)) << 16 | readEEPROM(CURR_M) << 8 | readEEPROM(CURR_L);
+    return (iA * iCurr) / 7629;
 }
 //TODO capire costante 7629
 UINT16 adutoa(UINT16 iADU)
 {
-    UINT32 iCurr = readEEPROM(CURR_H) << 14 | readEEPROM(CURR_L);
+    UINT32 iCurr = ((UINT32)readEEPROM(CURR_H) << 16) | readEEPROM(CURR_M) << 8 | readEEPROM(CURR_L);
     return (iADU * 7629) / iCurr;
 }
 
@@ -825,7 +826,7 @@ UINT16 adutomv(UINT16 iADU)
 // TODO capire costante 6944
 UINT16 recallmah()
 {
-    UINT32 iCurr = readEEPROM(CURR_H) << 14 | readEEPROM(CURR_L);
+    UINT32 iCurr = ((UINT32)readEEPROM(CURR_H)) << 16 | readEEPROM(CURR_M) << 8 | readEEPROM(CURR_L);
 
     return ((iMAh >> 16) * 6944) / iCurr;
 }
@@ -1141,24 +1142,28 @@ void changeProfile()
         switch(iSelItem)
         {
             case 0:
+            {
+                const char *sMsg1;
                 lcdOut(128,MSGCHANGE1);
                 lcdOut(192,MSGCHANGE2);
                 switch(readEEPROM(iCurrProfile+CHEMISTRY))
                 {
                     case NICD:
-                        lcdOut(139,MSGCHANGE3);
+                        sMsg1 = MSGCHANGE3;
                         break;
                     case NIMH:
-                        lcdOut(139,MSGCHANGE4);
+                        sMsg1 = MSGCHANGE4;
                         break;
                     case LIPO:
-                        lcdOut(139,MSGCHANGE5);
+                        sMsg1 = MSGCHANGE5;
                         break;
                     case SLA:
-                        lcdOut(139,MSGCHANGE6);
+                        sMsg1 = MSGCHANGE6;
                         break;
                 }
+                lcdOut(139,sMsg1);
                 break;
+            }
             case 1:
                 lcdOut(128,MSGCHANGE7);
                 lcdOut(192,MSGCHANGE8);
@@ -1259,18 +1264,28 @@ static void limitVal(UINT8 iAddr,UINT8 iLimit,UINT8 iValue,UINT8 iDirection)
     writeEEPROM(iAddr,iTmp);
 }
 
-static void limitVal16(UINT8 iAddr,UINT8 iDirection)
+static void limitValX(UINT8 iAddr,UINT8 iDirection,BOOL b32)
 {
-    UINT16 iTmp;
+    UINT32 iTmp;
 
     iTmp = readEEPROM(iAddr);
     iAddr++;
-    iTmp |= (readEEPROM(iAddr) << 8);
+    iTmp |= readEEPROM(iAddr) << 8;
+    if(b32)
+    {
+        iAddr++;
+        iTmp |= ((UINT32)readEEPROM(iAddr)) << 16;
+    }
     if(iDirection)
         iTmp -= 10;
     else
         iTmp += 10;
-    writeEEPROM(iAddr,iTmp >> 8);
+    if(b32)
+    {
+        writeEEPROM(iAddr,iTmp >> 16);
+        iAddr--;
+    }
+    writeEEPROM(iAddr,(iTmp >> 8) & 0xFF);
     iAddr--;
     writeEEPROM(iAddr,iTmp & 0xFF);
 }
@@ -1279,6 +1294,7 @@ void calibration(BOOL bCharge)
 {
     UINT8 iAddr;
     INT16 iTmp;
+    BOOL b32;
 
     lcdClear();
     bCalibrate = TRUE;
@@ -1289,11 +1305,13 @@ void calibration(BOOL bCharge)
     {
         iAction = IDLE;
         iAddr = R6_L;
+        b32 = FALSE;
     }
     else
     {
         iAction = CHARGECC;
         iAddr = CURR_L;
+        b32 = TRUE;
     }
     iKeys = 0;
     do {
@@ -1304,9 +1322,9 @@ void calibration(BOOL bCharge)
             iTmp = 0;
         displ(iTmp);
         if(iKeys & KEYBITDOWN) // Down Key
-            limitVal16(iAddr,0);
+            limitValX(iAddr,0,b32);
         else if(iKeys & KEYBITUP) // Up Key
-            limitVal16(iAddr,1);
+            limitValX(iAddr,1,b32);
     }while(!(iKeys & KEYBITENTER));
     iAction = IDLE;
     bCalibrate = FALSE;
